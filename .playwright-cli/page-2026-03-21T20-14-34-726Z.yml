@@ -1,0 +1,33 @@
+- main [ref=e2]:
+  - link "Back" [ref=e4] [cursor=pointer]:
+    - /url: /
+  - generic [ref=e5]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - heading "Seed Examples" [level=2] [ref=e9]
+        - button "Start Deep Agent Run" [ref=e10] [cursor=pointer]
+      - generic [ref=e11]:
+        - generic [ref=e12]: "in-scope: 0"
+        - generic [ref=e13]: "out-of-scope: 0"
+        - generic [ref=e14]: "ambiguous: 0"
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - generic [ref=e17]: in_scope
+          - textbox "in_scope" [ref=e18]: I was charged twice for my subscription. I cannot log into my account. Can you help me cancel my plan?
+        - generic [ref=e19]:
+          - generic [ref=e20]: out_of_scope
+          - textbox "out_of_scope" [ref=e21]: What is the distance from Earth to the sun? Can you write me a React component? Brainstorm a fantasy novel plot.
+        - generic [ref=e22]:
+          - generic [ref=e23]: ambiguous
+          - textbox "ambiguous" [ref=e24]: My account is locked and also can you help me write a scraper? Can you explain your billing and also recommend restaurants nearby?
+        - button "Save seed examples" [ref=e25] [cursor=pointer]
+    - generic [ref=e27]:
+      - heading "Runs" [level=2] [ref=e28]
+      - paragraph [ref=e30]: No runs started yet.
+    - generic [ref=e32]:
+      - heading "Live Playground" [level=2] [ref=e33]
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - generic [ref=e36]: Message
+          - textbox "Message" [ref=e37]
+        - button "Classify" [ref=e38] [cursor=pointer]

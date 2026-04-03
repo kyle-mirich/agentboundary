@@ -1,0 +1,91 @@
+<h2>The payoff: testing your classifier</h2>
+<p class="subtitle">Training is done. This is the "wow" moment. What should the test screen feel like?</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#fff;padding:20px;border-radius:8px;min-height:240px;display:flex;flex-direction:column;gap:14px;border:1px solid #e5e7eb;">
+      <!-- Completion banner -->
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;">
+        <span style="font-size:18px;">✓</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#15803d;">Classifier ready · F1 0.923</div>
+          <div style="font-size:11px;color:#16a34a;">3 rounds · 771 examples · 4m 12s</div>
+        </div>
+      </div>
+      <!-- Input -->
+      <div style="font-size:13px;color:#374151;">Try it — type anything:</div>
+      <div style="display:flex;gap:8px;">
+        <div style="flex:1;border:1.5px solid #111;border-radius:8px;padding:9px 12px;font-size:13px;color:#111;">I was charged twice this month</div>
+        <div style="background:#111;color:#fff;padding:9px 14px;border-radius:8px;font-size:13px;font-weight:500;">↵</div>
+      </div>
+      <!-- Result -->
+      <div style="padding:12px 14px;background:#f9fafb;border-radius:8px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="background:#111;color:#fff;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;">IN SCOPE</div>
+          <div style="font-size:12px;color:#6b7280;">96.2% confident</div>
+        </div>
+        <div style="display:flex;gap:4px;">
+          <div style="height:6px;width:32px;background:#111;border-radius:3px;"></div>
+          <div style="height:6px;width:8px;background:#e5e7eb;border-radius:3px;"></div>
+          <div style="height:6px;width:5px;background:#e5e7eb;border-radius:3px;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Inline on same page</h3>
+      <p>The checklist fades out, replaced by a green "ready" banner + input field. Press enter, see label + confidence. Same page, seamless transition. Most Apple-like.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#fff;padding:20px;border-radius:8px;min-height:240px;display:flex;flex-direction:column;gap:12px;border:1px solid #e5e7eb;">
+      <div style="text-align:center;padding:8px 0 4px;">
+        <div style="font-size:24px;font-weight:700;color:#111;">0.923</div>
+        <div style="font-size:11px;color:#9ca3af;letter-spacing:0.06em;text-transform:uppercase;">Macro F1 Score</div>
+      </div>
+      <!-- Mini results history -->
+      <div style="display:flex;flex-direction:column;gap:6px;flex:1;">
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#f9fafb;border-radius:6px;">
+          <div style="background:#111;color:#fff;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;white-space:nowrap;">IN SCOPE</div>
+          <div style="font-size:11px;color:#374151;flex:1;">I was charged twice this month</div>
+          <div style="font-size:10px;color:#9ca3af;">96%</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#f9fafb;border-radius:6px;">
+          <div style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;white-space:nowrap;">OUT OF SCOPE</div>
+          <div style="font-size:11px;color:#374151;flex:1;">Write me a haiku</div>
+          <div style="font-size:10px;color:#9ca3af;">99%</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <div style="flex:1;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 12px;font-size:12px;color:#9ca3af;">Type to test…</div>
+        <div style="background:#111;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;">↵</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Score hero + result history</h3>
+      <p>F1 score displayed big at top, results accumulate as a feed below the input. You can see a trail of what you tested. Great for showing off accuracy live.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#fff;padding:20px;border-radius:8px;min-height:240px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;border:1px solid #e5e7eb;text-align:center;">
+      <div style="font-size:36px;">🎯</div>
+      <div>
+        <div style="font-size:18px;font-weight:700;color:#111;">Your classifier is live.</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:4px;">F1 0.923 · In scope · Out of scope · Ambiguous</div>
+      </div>
+      <div style="width:100%;max-width:280px;border:2px solid #111;border-radius:10px;padding:10px 14px;font-size:13px;color:#9ca3af;text-align:left;">
+        My account is locked after too many attempts…
+      </div>
+      <div style="background:#111;color:#fff;padding:10px 32px;border-radius:8px;font-size:14px;font-weight:500;">
+        Classify ↵
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Full-screen celebration reveal</h3>
+      <p>Training done triggers a full-screen transition — everything clears, big centered "Your classifier is live" moment, then the input. Maximum drama for a demo.</p>
+    </div>
+  </div>
+
+</div>

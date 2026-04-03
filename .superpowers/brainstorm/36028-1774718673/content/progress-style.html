@@ -1,0 +1,206 @@
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+  @keyframes fillBar { from { width:0; } to { width:var(--w); } }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes fadeSlideIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes countUp { from{opacity:0;transform:scale(.85)} to{opacity:1;transform:scale(1)} }
+  @keyframes orbitSpin { to { transform: rotate(360deg); } }
+  @keyframes dash { to { stroke-dashoffset: 0; } }
+
+  .preview-wrap {
+    background: #f9f7f4;
+    border: 1px solid rgba(0,0,0,.09);
+    border-radius: 14px;
+    padding: 28px 24px;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* --- Option A: Orbital ring + milestone strip --- */
+  .orbit-wrap { display:flex; align-items:center; gap:20px; }
+  .orbit-ring {
+    position:relative; width:64px; height:64px; flex-shrink:0;
+  }
+  .orbit-svg { width:64px;height:64px; }
+  .orbit-track { fill:none;stroke:rgba(0,0,0,.08);stroke-width:4; }
+  .orbit-fill {
+    fill:none;stroke:#111;stroke-width:4;stroke-linecap:round;
+    stroke-dasharray:163;stroke-dashoffset:60;
+    transform-origin:50% 50%;
+    animation:orbitSpin 2.4s linear infinite;
+    transform-box:fill-box;
+  }
+  .orbit-pct {
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    font-size:13px;font-weight:600;color:#111;
+  }
+  .orbit-info { flex:1; }
+  .orbit-step { font-size:13px;font-weight:600;color:#111;margin-bottom:4px; }
+  .orbit-sub { font-size:12px;color:#888; }
+  .milestone-row { display:flex;gap:8px; }
+  .ms {
+    flex:1;padding:8px 10px;border-radius:8px;font-size:11px;font-weight:500;
+    background:#f1f1f1;color:#bbb;border:1px solid transparent;text-align:center;
+  }
+  .ms.done { background:#111;color:#fff; }
+  .ms.active { background:#fff;border:1px solid #111;color:#111;animation:pulse 1.8s ease-in-out infinite; }
+
+  /* --- Option B: Stacked progress bars --- */
+  .bar-stage { display:flex;flex-direction:column;gap:12px; }
+  .bar-item {}
+  .bar-label-row { display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px; }
+  .bar-name { color:#333;font-weight:500; }
+  .bar-val { color:#888; }
+  .bar-track {
+    height:5px;background:rgba(0,0,0,.07);border-radius:99px;overflow:hidden;
+  }
+  .bar-fill {
+    height:100%;border-radius:99px;background:#111;
+    animation:fillBar .9s cubic-bezier(.4,0,.2,1) both;
+  }
+  .bar-fill.done { background:#111; }
+  .bar-fill.active {
+    background:linear-gradient(90deg,#111 60%,rgba(17,17,17,.2));
+    background-size:200% 100%;
+  }
+  .bar-fill.pending { background:rgba(0,0,0,.12); }
+  .live-chip {
+    display:inline-flex;align-items:center;gap:5px;
+    background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:99px;
+    padding:4px 10px;font-size:11px;font-weight:500;color:#333;
+    box-shadow:0 1px 4px rgba(0,0,0,.06);
+  }
+  .live-dot {
+    width:6px;height:6px;border-radius:50%;background:#22c55e;
+    animation:pulse 1.4s ease-in-out infinite;
+  }
+
+  /* --- Option C: Terminal log with typewriter feel --- */
+  .terminal-wrap {
+    background:#111;border-radius:10px;overflow:hidden;
+  }
+  .terminal-bar {
+    background:#1a1a1a;padding:8px 14px;display:flex;align-items:center;gap:6px;
+    border-bottom:1px solid #222;
+  }
+  .t-dot { width:10px;height:10px;border-radius:50%; }
+  .t-title { margin-left:8px;font-size:11px;color:#555;font-family:monospace; }
+  .terminal-body { padding:14px;font-family:'SF Mono',monospace;font-size:11px;line-height:1.7; }
+  .t-line { display:flex;gap:8px;animation:fadeSlideIn .3s ease both; }
+  .t-time { color:#555;flex-shrink:0; }
+  .t-msg.ok { color:#4ade80; }
+  .t-msg.info { color:#93c5fd; }
+  .t-msg.dim { color:#555; }
+  .t-cursor { display:inline-block;width:7px;height:12px;background:#60a5fa;animation:blink .9s step-end infinite;vertical-align:middle;margin-left:2px; }
+  .t-status-row { display:flex;gap:6px;padding:10px 14px 12px;border-top:1px solid #1e1e1e; }
+  .t-badge { padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600; }
+  .t-badge.green { background:rgba(74,222,128,.15);color:#4ade80; }
+  .t-badge.blue { background:rgba(96,165,250,.15);color:#60a5fa; }
+  .t-badge.gray { background:rgba(255,255,255,.06);color:#555; }
+</style>
+
+<h2>How should the progress screens feel?</h2>
+<p class="subtitle">Same Warm Ivory base — different animation personality</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f9f7f4;padding:24px 20px;min-height:300px;">
+      <div class="preview-wrap" style="padding:20px 18px;">
+        <div style="font-size:11px;color:#aaa;letter-spacing:.06em;text-transform:uppercase;">Training your classifier</div>
+        <div class="orbit-wrap">
+          <div class="orbit-ring">
+            <svg class="orbit-svg" viewBox="0 0 64 64">
+              <circle class="orbit-track" cx="32" cy="32" r="26"/>
+              <circle class="orbit-fill" cx="32" cy="32" r="26"/>
+            </svg>
+            <div class="orbit-pct">62%</div>
+          </div>
+          <div class="orbit-info">
+            <div class="orbit-step">Training Round 2</div>
+            <div class="orbit-sub">Generating synthetic examples…</div>
+          </div>
+        </div>
+        <div class="milestone-row">
+          <div class="ms done">Seeds</div>
+          <div class="ms done">Round 1</div>
+          <div class="ms active">Round 2</div>
+          <div class="ms">Eval</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Orbital Ring</h3>
+      <p>Animated circular progress ring + milestone pill strip. Clean, app-like, inspired by Apple's activity rings.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f9f7f4;padding:24px 20px;min-height:300px;">
+      <div class="preview-wrap" style="padding:20px 18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:11px;color:#aaa;letter-spacing:.06em;text-transform:uppercase;">Training your classifier</div>
+          <div class="live-chip"><div class="live-dot"></div>Live</div>
+        </div>
+        <div class="bar-stage">
+          <div class="bar-item">
+            <div class="bar-label-row"><span class="bar-name">Seed generation</span><span class="bar-val" style="color:#22c55e;">Done</span></div>
+            <div class="bar-track"><div class="bar-fill done" style="--w:100%;width:100%;"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-label-row"><span class="bar-name">Training Round 1</span><span class="bar-val" style="color:#22c55e;">F1 0.871</span></div>
+            <div class="bar-track"><div class="bar-fill done" style="--w:100%;width:100%;"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-label-row"><span class="bar-name">Training Round 2</span><span class="bar-val">In progress…</span></div>
+            <div class="bar-track"><div class="bar-fill active" style="width:60%;background:linear-gradient(90deg,#111 0%,rgba(17,17,17,.3) 100%);"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-label-row"><span class="bar-name">Evaluation</span><span class="bar-val" style="color:#ccc;">Waiting</span></div>
+            <div class="bar-track"><div class="bar-fill pending" style="width:0%;"></div></div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#aaa;padding-top:4px;">Generating synthetic examples from seed data…</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Stacked Progress Bars</h3>
+      <p>Individual bars per stage with live F1 scores populating as they complete. Data-forward, satisfying to watch fill.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#111;padding:20px;min-height:300px;border-radius:0;">
+      <div style="font-size:11px;color:rgba(255,255,255,.3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;font-family:-apple-system,sans-serif;">Training your classifier</div>
+      <div class="terminal-wrap">
+        <div class="terminal-bar">
+          <div class="t-dot" style="background:#ff5f57;"></div>
+          <div class="t-dot" style="background:#ffbd2e;"></div>
+          <div class="t-dot" style="background:#28c840;"></div>
+          <span class="t-title">training · round 2 of 2</span>
+        </div>
+        <div class="terminal-body">
+          <div class="t-line" style="animation-delay:.0s"><span class="t-time">09:41</span><span class="t-msg ok">✓ Seeds generated — 48 examples</span></div>
+          <div class="t-line" style="animation-delay:.1s"><span class="t-time">09:41</span><span class="t-msg ok">✓ Round 1 complete — F1 0.871</span></div>
+          <div class="t-line" style="animation-delay:.2s"><span class="t-time">09:42</span><span class="t-msg info">→ Generating synthetic examples…</span></div>
+          <div class="t-line" style="animation-delay:.3s"><span class="t-time">09:42</span><span class="t-msg dim">  Requesting GPT-5 completions (batch 2/4)<span class="t-cursor"></span></span></div>
+        </div>
+        <div class="t-status-row">
+          <div class="t-badge green">seeds ✓</div>
+          <div class="t-badge green">round 1 ✓</div>
+          <div class="t-badge blue">round 2 ···</div>
+          <div class="t-badge gray">eval</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Terminal Log</h3>
+      <p>Live log output in a dark terminal panel. Shows the real backend working in real time. Developer-authentic.</p>
+    </div>
+  </div>
+
+</div>

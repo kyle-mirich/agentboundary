@@ -1,0 +1,143 @@
+<style>
+  .lp {
+    background: #f9f7f4;
+    border: 1px solid rgba(0,0,0,.09);
+    border-radius: 14px;
+    padding: 32px 28px;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .lp-eyebrow { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#aaa; margin-bottom:6px; }
+  .lp-name { font-size:28px; font-weight:600; color:#111; letter-spacing:-.5px; margin-bottom:0; }
+  .lp-role { font-size:14px; color:#555; margin-bottom:16px; }
+  .lp-bio { font-size:13px; color:#777; line-height:1.6; margin-bottom:16px; }
+  .lp-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+  .lp-tag {
+    font-size:11px; font-weight:500; color:#555;
+    background:#fff; border:1px solid rgba(0,0,0,.1);
+    border-radius:99px; padding:3px 10px;
+  }
+  .lp-links { display:flex; gap:12px; }
+  .lp-link { font-size:12px; color:#888; text-decoration:none; }
+  .lp-link:hover { color:#111; }
+  .lp-divider { height:1px; background:rgba(0,0,0,.07); margin:16px 0; }
+  .lp-input-area {
+    background:#fff; border:1px solid rgba(0,0,0,.1); border-radius:10px;
+    padding:14px; box-shadow:0 2px 10px rgba(0,0,0,.05);
+  }
+  .lp-placeholder { font-size:13px; color:#ccc; font-style:italic; margin-bottom:14px; }
+  .lp-btns { display:flex; gap:8px; }
+  .lp-btn-primary {
+    flex:1; background:#111; color:#fff; border:none; border-radius:8px;
+    padding:10px; font-size:13px; font-weight:500; text-align:center;
+  }
+  .lp-btn-secondary {
+    background:#f4f4f4; border:1px solid #e5e5e5; color:#666;
+    border-radius:8px; padding:10px 14px; font-size:13px;
+  }
+</style>
+
+<h2>How much "about me" on the landing screen?</h2>
+<p class="subtitle">All three show your name and role — they differ in how much personal context appears before the prompt</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f5f3f0;padding:20px 18px;">
+      <div class="lp">
+        <div>
+          <div class="lp-eyebrow">Portfolio Demo</div>
+          <div class="lp-name">Kyle Mirich</div>
+          <div class="lp-role">AI Engineer · Agents & Evaluations</div>
+          <div class="lp-divider"></div>
+          <div class="lp-input-area">
+            <div class="lp-placeholder">Classify customer support tickets for a SaaS billing product…</div>
+            <div class="lp-btns">
+              <div class="lp-btn-primary">Start demo</div>
+              <div class="lp-btn-secondary">Feeling lucky</div>
+            </div>
+          </div>
+        </div>
+        <div class="lp-links" style="margin-top:16px;">
+          <span class="lp-link">github.com/kyle-mirich</span>
+          <span class="lp-link">linkedin</span>
+          <span class="lp-link">portfolio ↗</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Let the demo speak</h3>
+      <p>Name, role, and links only. Prompt is front-and-center immediately. Maximum focus on the product.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f5f3f0;padding:20px 18px;">
+      <div class="lp">
+        <div>
+          <div class="lp-eyebrow">Portfolio Demo</div>
+          <div class="lp-name">Kyle Mirich</div>
+          <div class="lp-role">AI Engineer</div>
+          <div class="lp-bio">Building agents, evaluation frameworks, and autonomous systems. This demo trains a real text classifier — live, in your browser, against a real backend.</div>
+          <div class="lp-divider"></div>
+          <div class="lp-input-area">
+            <div class="lp-placeholder">Classify customer support tickets for a SaaS billing product…</div>
+            <div class="lp-btns">
+              <div class="lp-btn-primary">Start demo</div>
+              <div class="lp-btn-secondary">Feeling lucky</div>
+            </div>
+          </div>
+        </div>
+        <div class="lp-links" style="margin-top:16px;">
+          <span class="lp-link">github.com/kyle-mirich</span>
+          <span class="lp-link">linkedin ↗</span>
+          <span class="lp-link">kyle-mirich.vercel.app ↗</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — One-liner context</h3>
+      <p>Short bio sentence explaining who you are and what the demo does. Recruiter-readable in 5 seconds.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f5f3f0;padding:20px 18px;">
+      <div class="lp">
+        <div>
+          <div class="lp-eyebrow">Portfolio Demo</div>
+          <div class="lp-name">Kyle Mirich</div>
+          <div class="lp-role">AI Engineer</div>
+          <div class="lp-bio">Building agents, evaluation frameworks, and autonomous systems that ship.</div>
+          <div class="lp-tags">
+            <span class="lp-tag">Agent Systems</span>
+            <span class="lp-tag">Evaluations</span>
+            <span class="lp-tag">Autonomous Frameworks</span>
+            <span class="lp-tag">Applied AI</span>
+          </div>
+          <div class="lp-divider"></div>
+          <div class="lp-input-area">
+            <div class="lp-placeholder">Classify customer support tickets for a SaaS billing product…</div>
+            <div class="lp-btns">
+              <div class="lp-btn-primary">Start demo</div>
+              <div class="lp-btn-secondary">Feeling lucky</div>
+            </div>
+          </div>
+        </div>
+        <div class="lp-links" style="margin-top:16px;">
+          <span class="lp-link">github.com/kyle-mirich</span>
+          <span class="lp-link">linkedin ↗</span>
+          <span class="lp-link">kyle-mirich.vercel.app ↗</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Bio + skill tags</h3>
+      <p>Bio plus keyword chips for agents, evals, autonomous frameworks. Skimmable and ATS-friendly for recruiters.</p>
+    </div>
+  </div>
+
+</div>

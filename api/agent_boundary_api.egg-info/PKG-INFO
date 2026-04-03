@@ -1,0 +1,24 @@
+Metadata-Version: 2.4
+Name: agent-boundary-api
+Version: 0.1.0
+Summary: FastAPI backend for a Deep Agents in-scope text classifier
+Requires-Python: >=3.11
+Requires-Dist: deepagents<1.0.0,>=0.4.12
+Requires-Dist: fastapi>=0.115.0
+Requires-Dist: langchain<2.0.0,>=1.0.0
+Requires-Dist: langchain-core<2.0.0,>=1.0.0
+Requires-Dist: langchain-openai<2.0.0,>=1.0.0
+Requires-Dist: langgraph<2.0.0,>=1.0.0
+Requires-Dist: langsmith<1.0.0,>=0.3.0
+Requires-Dist: openai>=2.29.0
+Requires-Dist: psycopg2-binary>=2.9.0
+Requires-Dist: pydantic-settings>=2.6.0
+Requires-Dist: scikit-learn>=1.5.0
+Requires-Dist: torch>=2.5.0
+Requires-Dist: transformers>=4.48.0
+Requires-Dist: uvicorn>=0.34.0
+Provides-Extra: dev
+Requires-Dist: httpx>=0.28.0; extra == "dev"
+Requires-Dist: pytest>=8.3.0; extra == "dev"
+Provides-Extra: runloop
+Requires-Dist: langchain-runloop>=0.0.3; extra == "runloop"

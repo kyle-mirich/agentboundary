@@ -1,0 +1,22 @@
+.DS_Store
+.worktrees
+.next
+.pytest_cache
+.venv
+__pycache__
+node_modules
+dist
+build
+artifacts
+data
+*.pyc
+*.sqlite3
+*.db
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key

@@ -1,0 +1,40 @@
+[project]
+name = "agent-boundary-api"
+version = "0.1.0"
+description = "FastAPI backend for a Deep Agents in-scope text classifier"
+requires-python = ">=3.11"
+dependencies = [
+  "deepagents>=0.4.12,<1.0.0",
+  "fastapi>=0.115.0",
+  "langchain>=1.0.0,<2.0.0",
+  "langchain-core>=1.0.0,<2.0.0",
+  "langchain-openai>=1.0.0,<2.0.0",
+  "langgraph>=1.0.0,<2.0.0",
+  "langsmith>=0.3.0,<1.0.0",
+  "openai>=2.29.0",
+  "psycopg2-binary>=2.9.0",
+  "pydantic-settings>=2.6.0",
+  "scikit-learn>=1.5.0",
+  "torch>=2.5.0",
+  "transformers>=4.48.0",
+  "uvicorn>=0.34.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28.0",
+  "pytest>=8.3.0",
+]
+runloop = [
+  "langchain-runloop>=0.0.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]

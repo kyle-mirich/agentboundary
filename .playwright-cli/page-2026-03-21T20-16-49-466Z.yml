@@ -1,0 +1,46 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - link "Back" [ref=e4] [cursor=pointer]:
+      - /url: /
+    - generic [ref=e5]:
+      - generic [ref=e7]:
+        - generic [ref=e8]:
+          - heading "Seed Examples" [level=2] [ref=e9]
+          - button "Start Deep Agent Run" [ref=e10] [cursor=pointer]
+        - generic [ref=e11]:
+          - generic [ref=e12]: "in-scope: 5"
+          - generic [ref=e13]: "out-of-scope: 5"
+          - generic [ref=e14]: "ambiguous: 3"
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - generic [ref=e17]: in_scope
+            - textbox "in_scope" [ref=e18]: I was charged twice for my subscription. I cannot log into my account. Can you help me cancel my plan?
+          - generic [ref=e19]:
+            - generic [ref=e20]: out_of_scope
+            - textbox "out_of_scope" [ref=e21]: What is the distance from Earth to the sun? Can you write me a React component? Brainstorm a fantasy novel plot.
+          - generic [ref=e22]:
+            - generic [ref=e23]: ambiguous
+            - textbox "ambiguous" [ref=e24]: My account is locked and also can you help me write a scraper? Can you explain your billing and also recommend restaurants nearby?
+          - button "Save seed examples" [ref=e25] [cursor=pointer]
+      - generic [ref=e27]:
+        - heading "Runs" [level=2] [ref=e28]
+        - 'button "125df515 failed Run failed best macro F1: n/a" [ref=e30] [cursor=pointer]':
+          - generic [ref=e31]:
+            - strong [ref=e32]: 125df515
+            - generic [ref=e33]: failed
+          - generic [ref=e34]: Run failed
+          - generic [ref=e35]: "best macro F1: n/a"
+        - heading "Plan" [level=3] [ref=e36]
+        - generic [ref=e37]: "# Run Plan - Project: Live Support Smoke 3 - Objective: Route incoming messages as in_scope, out_of_scope, or ambiguous. - Round budget: 1 - Macro F1 target: 0.1 - Out-of-scope precision target: 0.1"
+        - heading "Latest Review" [level=3] [ref=e38]
+        - generic [ref=e39]: No review captured yet.
+      - generic [ref=e41]:
+        - heading "Live Playground" [level=2] [ref=e42]
+        - generic [ref=e43]:
+          - generic [ref=e44]:
+            - generic [ref=e45]: Message
+            - textbox "Message" [ref=e46]
+          - button "Classify" [ref=e47] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=e53] [cursor=pointer]:
+    - img [ref=e54]
+  - alert [ref=e57]

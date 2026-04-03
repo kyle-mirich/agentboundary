@@ -1,0 +1,95 @@
+<h2>What does the training screen look like?</h2>
+<p class="subtitle">After they type their domain and hit "Build it" — this is where the magic plays out live.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#fff;padding:20px;border-radius:8px;min-height:220px;display:flex;flex-direction:column;gap:14px;border:1px solid #e5e7eb;">
+      <div style="font-size:12px;color:#6b7280;letter-spacing:0.08em;text-transform:uppercase;">Building your classifier</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:18px;height:18px;border-radius:50%;background:#111;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;flex-shrink:0;">✓</div>
+          <div style="font-size:13px;color:#374151;">Generating seed examples with GPT-5</div>
+          <div style="margin-left:auto;font-size:11px;color:#9ca3af;">771 rows</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:18px;height:18px;border-radius:50%;background:#111;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <div style="width:8px;height:8px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+          </div>
+          <div style="font-size:13px;color:#111;font-weight:500;">Fine-tuning DistilBERT · Round 2</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:18px;height:18px;border-radius:50%;border:1.5px solid #d1d5db;flex-shrink:0;"></div>
+          <div style="font-size:13px;color:#9ca3af;">Evaluating on holdout set</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:18px;height:18px;border-radius:50%;border:1.5px solid #d1d5db;flex-shrink:0;"></div>
+          <div style="font-size:13px;color:#9ca3af;">Test your classifier</div>
+        </div>
+      </div>
+      <div style="background:#f9fafb;border-radius:8px;padding:10px 12px;font-size:11px;color:#6b7280;font-family:monospace;line-height:1.6;">
+        epoch 2/3 · loss 0.341 · f1 0.847<br>
+        generating harder negatives…
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Checklist + Live Log</h3>
+      <p>4-step checklist with spinner on active step, live log output below. Simple, clear, shows progress at a glance.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#fff;padding:20px;border-radius:8px;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;border:1px solid #e5e7eb;">
+      <div style="position:relative;width:80px;height:80px;">
+        <svg viewBox="0 0 80 80" style="transform:rotate(-90deg);width:80px;height:80px;">
+          <circle cx="40" cy="40" r="34" fill="none" stroke="#f3f4f6" stroke-width="6"/>
+          <circle cx="40" cy="40" r="34" fill="none" stroke="#111" stroke-width="6" stroke-dasharray="213" stroke-dashoffset="85" stroke-linecap="round"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#111;">60%</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:15px;font-weight:600;color:#111;">Fine-tuning · Round 2 of 3</div>
+        <div style="font-size:12px;color:#9ca3af;margin-top:4px;">F1 score improving: 0.71 → 0.85</div>
+      </div>
+      <div style="display:flex;gap:20px;">
+        <div style="text-align:center;"><div style="font-size:18px;font-weight:700;color:#111;">771</div><div style="font-size:11px;color:#9ca3af;">examples</div></div>
+        <div style="text-align:center;"><div style="font-size:18px;font-weight:700;color:#111;">0.85</div><div style="font-size:11px;color:#9ca3af;">F1 score</div></div>
+        <div style="text-align:center;"><div style="font-size:18px;font-weight:700;color:#111;">2:41</div><div style="font-size:11px;color:#9ca3af;">elapsed</div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Big Circular Progress + Stats</h3>
+      <p>A large ring showing overall progress, 3 key numbers below. Feels polished and focused. Very visual for demos.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#fff;padding:20px;border-radius:8px;min-height:220px;display:flex;flex-direction:column;gap:12px;border:1px solid #e5e7eb;">
+      <div style="font-size:13px;font-weight:600;color:#111;">Customer Support Classifier</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <div style="flex:1;height:4px;background:#111;border-radius:2px;"></div>
+        <div style="flex:1;height:4px;background:#111;border-radius:2px;opacity:0.6;"></div>
+        <div style="flex:1;height:4px;background:#e5e7eb;border-radius:2px;"></div>
+        <div style="flex:1;height:4px;background:#e5e7eb;border-radius:2px;"></div>
+      </div>
+      <div style="display:flex;gap:4px;font-size:10px;color:#9ca3af;justify-content:space-between;">
+        <span>Seeds ✓</span><span>Train R1 ✓</span><span style="color:#111;font-weight:500;">Train R2…</span><span>Test</span>
+      </div>
+      <div style="background:#f9fafb;border-radius:8px;padding:12px;flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">
+        <div style="font-size:11px;color:#374151;font-family:monospace;">✓ Generated 771 examples (billing, login, refund…)</div>
+        <div style="font-size:11px;color:#374151;font-family:monospace;">✓ Round 1 complete · F1 0.71</div>
+        <div style="font-size:11px;color:#111;font-family:monospace;font-weight:500;">⟳ Round 2 · epoch 2/3 · F1 0.85</div>
+        <div style="font-size:11px;color:#9ca3af;font-family:monospace;">  generating harder negatives…</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Progress Bar + Scrolling Feed</h3>
+      <p>Thin segmented progress bar at top, live scrolling log below. Familiar to developers. Easiest to narrate in an interview.</p>
+    </div>
+  </div>
+
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>

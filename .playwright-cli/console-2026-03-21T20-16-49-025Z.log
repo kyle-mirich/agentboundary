@@ -1,0 +1,4 @@
+[     391ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:3000/favicon.ico:0
+[ 1578290ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8000/projects/fc923d20-35d5-4d9c-8c41-e1745b304f22:0
+[ 1597970ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8000/projects/fc923d20-35d5-4d9c-8c41-e1745b304f22:0
+[ 1603708ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8000/projects/fc923d20-35d5-4d9c-8c41-e1745b304f22:0

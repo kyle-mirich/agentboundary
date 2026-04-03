@@ -1,0 +1,156 @@
+[     333ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:25630
+[     402ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:3000/favicon.ico:0
+[   20173ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:196
+[   20399ms] [LOG] [Fast Refresh] done in 227ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/report-hmr-latency.js:13
+[   26097ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:25630
+[   44562ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:196
+[   44746ms] [LOG] [Fast Refresh] done in 185ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/report-hmr-latency.js:13
+[   44797ms] [LOG] [HMR] Detected local css modules. Reload all css @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/mini-css-extract-plugin/hmr/hotModuleReplacement.js:1
+[   49925ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:25630
+[   57310ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:196
+[   57602ms] [LOG] [Fast Refresh] done in 292ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/report-hmr-latency.js:13
+[   57649ms] [LOG] [HMR] Detected local css modules. Reload all css @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/mini-css-extract-plugin/hmr/hotModuleReplacement.js:1
+[  475296ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:3000/:0
+[  475480ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(pages-dir-browser)/./node_modules/react-dom/cjs/react-dom-client.development.js:24594
+[  475539ms] TypeError: __webpack_modules__[moduleId] is not a function
+    at Object.__webpack_require__ [as require] (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/webpack-runtime.js:25:42)
+    at Object.require (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:39:28541)
+    at globalThis.__next_require__ (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:39:29364)
+    at requireModule (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:2:318257)
+    at initializeModuleChunk (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:2:347649)
+    at getOutlinedModel (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:2:357408)
+    at <unknown> (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:2:365361)
+    at ResponseInstance._fromJSON (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:2:365452)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:2:347040)
+    at resolveModelChunk (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:2:345328)
+    at processFullStringRow (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:2:384472)
+    at <unknown> (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:2:386875)
+    at processBinaryChunk (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:2:386947)
+    at progress (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:2:388475)
+[  475540ms] [LOG] [HMR] connected @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:45
+[  478826ms] [WARNING] The resource http://127.0.0.1:3000/_next/static/media/8a1d8947e5852e30-s.p.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://127.0.0.1:3000/:0
+[  478827ms] [WARNING] The resource http://127.0.0.1:3000/_next/static/media/13971731025ec697-s.p.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://127.0.0.1:3000/:0
+[  478827ms] [WARNING] The resource http://127.0.0.1:3000/_next/static/media/558ca1a6aa3cb55e-s.p.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://127.0.0.1:3000/:0
+[  506043ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:3000/:0
+[  506140ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(pages-dir-browser)/./node_modules/react-dom/cjs/react-dom-client.development.js:24594
+[  506147ms] Error: Cannot find module './547.js'
+Require stack:
+- /Users/kyle/Dev/projects/pytorch-practice/web/.next/server/webpack-runtime.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/.next/server/pages/_document.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/require.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/load-components.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/build/utils.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/build/swc/options.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/build/swc/index.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/build/analysis/parse-module.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/build/analysis/get-page-static-info.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/router-server.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/start-server.js
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1421:15)
+    at <unknown> (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/require-hook.js:57:36)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1504:12)
+    at mod.require (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/require-hook.js:68:28)
+    at require (node:internal/modules/helpers:152:16)
+    at __webpack_require__.f.require (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/webpack-runtime.js:190:28)
+    at <unknown> (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/webpack-runtime.js:103:40)
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/webpack-runtime.js:102:67)
+    at Array.map (<anonymous>)
+    at __webpack_require__.X (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/webpack-runtime.js:154:22)
+    at <unknown> (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/app/page.js:2:44083)
+    at Object.<anonymous> (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/app/page.js:2:44128)
+    at Module._compile (node:internal/modules/cjs/loader:1761:14)
+    at Object..js (node:internal/modules/cjs/loader:1893:10)
+    at Module.load (node:internal/modules/cjs/loader:1481:32)
+    at Module._load (node:internal/modules/cjs/loader:1300:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1504:12)
+    at mod.require (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/require-hook.js:68:28)
+    at require (node:internal/modules/helpers:152:16)
+    at requirePage (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/require.js:99:80)
+    at loadComponentsImpl (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/load-components.js:132:57)
+    at async DevServer.findPageComponentsImpl (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/next-server.js:899:36)
+    at async DevServer.findPageComponents (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/dev/next-dev-server.js:706:16)
+    at async DevServer.renderPageComponent (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/base-server.js:1460:24)
+    at async DevServer.renderToResponseImpl (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/base-server.js:1514:32)
+    at async DevServer.pipeImpl (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/base-server.js:1025:25)
+    at async NextNodeServer.handleCatchallRenderRequest (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/next-server.js:393:17)
+    at async DevServer.handleRequestImpl (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/base-server.js:916:17)
+    at async (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/dev/next-dev-server.js:400:20)
+    at async Span.traceAsyncFn (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/trace/trace.js:157:20)
+    at async DevServer.handleRequest (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/dev/next-dev-server.js:396:24)
+    at async invokeRender (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/router-server.js:240:21)
+    at async handleRequest (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/router-server.js:437:24)
+    at async requestHandlerImpl (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/router-server.js:485:13)
+    at async Server.requestListener (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/start-server.js:226:13)
+[  506147ms] [LOG] [HMR] connected @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:45
+[  519189ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/hot-reloader-pages.js:206
+[  519369ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/hot-reloader-pages.js:347
+[  519616ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://127.0.0.1:3000/:0
+[  519723ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(pages-dir-browser)/./node_modules/react-dom/cjs/react-dom-client.development.js:24594
+[  519731ms] Error: Cannot find module './547.js'
+Require stack:
+- /Users/kyle/Dev/projects/pytorch-practice/web/.next/server/webpack-runtime.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/.next/server/app/page.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/require.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/load-components.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/build/utils.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/build/swc/options.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/build/swc/index.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/build/analysis/parse-module.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/build/analysis/get-page-static-info.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/router-server.js
+- /Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/start-server.js
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1421:15)
+    at <unknown> (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/require-hook.js:57:36)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1504:12)
+    at mod.require (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/require-hook.js:68:28)
+    at require (node:internal/modules/helpers:152:16)
+    at __webpack_require__.f.require (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/webpack-runtime.js:190:28)
+    at <unknown> (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/webpack-runtime.js:103:40)
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/webpack-runtime.js:102:67)
+    at Array.map (<anonymous>)
+    at __webpack_require__.X (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/webpack-runtime.js:154:22)
+    at <unknown> (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/app/page.js:2:44083)
+    at Object.<anonymous> (file:///Users/kyle/Dev/projects/pytorch-practice/web/.next/server/app/page.js:2:44128)
+    at Module._compile (node:internal/modules/cjs/loader:1761:14)
+    at Object..js (node:internal/modules/cjs/loader:1893:10)
+    at Module.load (node:internal/modules/cjs/loader:1481:32)
+    at Module._load (node:internal/modules/cjs/loader:1300:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1504:12)
+    at mod.require (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/require-hook.js:68:28)
+    at require (node:internal/modules/helpers:152:16)
+    at requirePage (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/require.js:99:80)
+    at loadComponentsImpl (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/load-components.js:132:57)
+    at async DevServer.findPageComponentsImpl (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/next-server.js:899:36)
+    at async DevServer.findPageComponents (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/dev/next-dev-server.js:706:16)
+    at async DevServer.renderPageComponent (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/base-server.js:1460:24)
+    at async DevServer.renderToResponseImpl (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/base-server.js:1514:32)
+    at async DevServer.pipeImpl (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/base-server.js:1025:25)
+    at async NextNodeServer.handleCatchallRenderRequest (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/next-server.js:393:17)
+    at async DevServer.handleRequestImpl (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/base-server.js:916:17)
+    at async (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/dev/next-dev-server.js:400:20)
+    at async Span.traceAsyncFn (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/trace/trace.js:157:20)
+    at async DevServer.handleRequest (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/dev/next-dev-server.js:396:24)
+    at async invokeRender (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/router-server.js:240:21)
+    at async handleRequest (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/router-server.js:437:24)
+    at async requestHandlerImpl (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/router-server.js:485:13)
+    at async Server.requestListener (file:///Users/kyle/Dev/projects/pytorch-practice/web/node_modules/next/dist/server/lib/start-server.js:226:13)
+[  519731ms] [LOG] [HMR] connected @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/websocket.js:45
