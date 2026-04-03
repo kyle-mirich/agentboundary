@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import random
-import re
 
 from openai import APIConnectionError, APITimeoutError, OpenAI
 
@@ -36,7 +35,6 @@ Return this schema only:
 
 _REQUEST_TIMEOUT_SECONDS = 20.0
 _SEEDS_PER_LABEL = 30
-_FALLBACK_TOPIC_LIMIT = 4
 _LUCKY_PROMPTS = [
     "The chatbot should handle questions about Star Wars lore, characters, timelines, and canon debates.",
     "The chatbot should handle feedback on startup pitches, business models, and target customers.",
@@ -60,68 +58,8 @@ _LUCKY_PROMPTS = [
     "The chatbot should handle wedding planning timelines, vendor checklists, and guest logistics.",
     "The chatbot should handle nonfiction book recommendations, reading order, and note-taking methods.",
 ]
-_DEFAULT_TOPICS = ["billing", "refunds", "account access", "login issues"]
-_OUT_OF_SCOPE_TOPICS = [
-    "Python debugging",
-    "travel planning",
-    "creative writing",
-    "general trivia",
-]
-_AMBIGUOUS_EXTRAS = [
-    "also help me write code",
-    "and recommend a vacation spot",
-    "plus answer a trivia question",
-    "and draft a marketing slogan",
-]
-
-
 def _fallback_lucky_description() -> str:
     return random.choice(_LUCKY_PROMPTS)
-
-
-def _extract_topics(description: str) -> list[str]:
-    fragments = re.split(r"[,\n]| and | or ", description.lower())
-    cleaned: list[str] = []
-    for fragment in fragments:
-        normalized = re.sub(r"[^a-z0-9 ]+", " ", fragment).strip()
-        if len(normalized) < 4:
-            continue
-        if normalized in cleaned:
-            continue
-        cleaned.append(normalized)
-    return (cleaned[:_FALLBACK_TOPIC_LIMIT] or _DEFAULT_TOPICS).copy()
-
-
-def _fallback_examples(description: str) -> list[ExampleInput]:
-    topics = _extract_topics(description)
-    in_scope = [
-        ExampleInput(
-            text=f"I need help with {topics[i % len(topics)]} for request #{i + 1}.",
-            label=Label.IN_SCOPE,
-            source=ExampleSource.HUMAN_SEED,
-        )
-        for i in range(_SEEDS_PER_LABEL)
-    ]
-    out_of_scope = [
-        ExampleInput(
-            text=f"Can you help with {_OUT_OF_SCOPE_TOPICS[i % len(_OUT_OF_SCOPE_TOPICS)]} instead of support issue #{i + 1}?",
-            label=Label.OUT_OF_SCOPE,
-            source=ExampleSource.HUMAN_SEED,
-        )
-        for i in range(_SEEDS_PER_LABEL)
-    ]
-    ambiguous = [
-        ExampleInput(
-            text=(
-                f"I have a {topics[i % len(topics)]} problem, "
-                f"{_AMBIGUOUS_EXTRAS[i % len(_AMBIGUOUS_EXTRAS)]} for request #{i + 1}."
-            ),
-            label=Label.AMBIGUOUS,
-            source=ExampleSource.HUMAN_SEED,
-        )
-        for i in range(_SEEDS_PER_LABEL)
-    ]
-    return in_scope + out_of_scope + ambiguous
 
 
 def generate_seeds(description: str) -> list[ExampleInput]:
@@ -130,7 +68,7 @@ def generate_seeds(description: str) -> list[ExampleInput]:
     Retries once on parse failure. Raises RuntimeError if both attempts fail.
     """
     if not settings.openai_api_key:
-        return _fallback_examples(description)
+        raise RuntimeError("OPENAI_API_KEY is required to generate seeds")
 
     client = OpenAI(
         api_key=settings.openai_api_key,
@@ -167,14 +105,15 @@ def generate_seeds(description: str) -> list[ExampleInput]:
     try:
         return _attempt()
     except (APITimeoutError, APIConnectionError):
-        return _fallback_examples(description)
+        pass
     except Exception:
         try:
             return _attempt()
         except (APITimeoutError, APIConnectionError):
-            return _fallback_examples(description)
+            pass
         except Exception as exc:
             raise RuntimeError("Seed generation failed") from exc
+    raise RuntimeError("Seed generation failed")
 
 
 def generate_lucky_description() -> str:

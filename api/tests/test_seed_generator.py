@@ -99,7 +99,7 @@ def test_generate_seeds_raises_after_two_failures():
             generate_seeds("any domain")
 
 
-def test_generate_seeds_falls_back_on_timeout():
+def test_generate_seeds_raises_on_timeout():
     with (
         patch.object(config_module.settings, "openai_api_key", "test-key"),
         patch("app.seed_generator.OpenAI") as mock_cls,
@@ -107,11 +107,11 @@ def test_generate_seeds_falls_back_on_timeout():
         mock_cls.return_value.chat.completions.create.side_effect = APITimeoutError(
             request=MagicMock()
         )
-        results = generate_seeds("classify customer support tickets")
+        with pytest.raises(RuntimeError, match="Seed generation failed"):
+            generate_seeds("classify customer support tickets")
 
-    assert len(results) == 90
-    assert {result.label for result in results} == {
-        Label.IN_SCOPE,
-        Label.OUT_OF_SCOPE,
-        Label.AMBIGUOUS,
-    }
+
+def test_generate_seeds_raises_without_openai_key():
+    with patch.object(config_module.settings, "openai_api_key", ""):
+        with pytest.raises(RuntimeError, match="OPENAI_API_KEY is required to generate seeds"):
+            generate_seeds("classify customer support tickets")

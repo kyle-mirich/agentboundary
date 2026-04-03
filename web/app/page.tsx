@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import Link from "next/link";
 import styles from "./page.module.css";
 import {
   API_BASE_URL,
@@ -452,9 +453,19 @@ function ResultShell(props: {
           </div>
 
           <div className={styles.resultActionRow}>
-            <button className={styles.secondaryButton} onClick={props.onStartAnother} type="button">
+            <button
+              className={`${styles.secondaryButton} ${styles.resultActionButton} ${styles.resultActionLeft}`}
+              onClick={props.onStartAnother}
+              type="button"
+            >
               Start another run
             </button>
+            <Link
+              className={`${styles.secondaryButton} ${styles.resultActionButton} ${styles.resultActionCenter}`}
+              href="/read-more"
+            >
+              Read more
+            </Link>
             <div className={styles.resultFooterLinks}>
               <a
                 className={styles.resultFooterLink}
@@ -524,6 +535,31 @@ function ErrorShell(props: {
 }
 
 function LuckyPromptModal(props: { prompt: string; loading: boolean; closing: boolean }) {
+  const [displayed, setDisplayed] = useState("");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!props.prompt) {
+      setDisplayed("");
+      return;
+    }
+    setDisplayed("");
+    let i = 0;
+    function tick() {
+      i++;
+      setDisplayed(props.prompt.slice(0, i));
+      if (i < props.prompt.length) {
+        timerRef.current = setTimeout(tick, 18 + Math.random() * 14);
+      }
+    }
+    timerRef.current = setTimeout(tick, 18);
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
+  }, [props.prompt]);
+
+  const typing = displayed.length < props.prompt.length;
+
   return (
     <>
       <div className={styles.drawerBackdrop} aria-hidden="true" />
@@ -537,21 +573,24 @@ function LuckyPromptModal(props: { prompt: string; loading: boolean; closing: bo
         <h2 className={styles.luckyModalTitle}>
           {props.loading ? "Choosing a scope" : "Selected scope"}
         </h2>
-        {props.loading ? (
-          <div className={styles.luckyModalLoading}>
-            <span className={styles.luckyModalSpinner} aria-hidden="true" />
+        <div className={styles.luckyModalContent}>
+          {props.loading ? (
+            <div className={styles.luckyModalLoading}>
+              <span className={styles.luckyModalSpinner} aria-hidden="true" />
+              <p className={styles.luckyModalBody}>
+                Finding a realistic chatbot boundary for the demo…
+              </p>
+            </div>
+          ) : (
             <p className={styles.luckyModalBody}>
-              Finding a realistic chatbot boundary for the demo…
+              <span aria-hidden="true" style={{ visibility: "hidden" }}>{props.prompt}</span>
+              <span className={styles.luckyModalTyped} aria-live="polite">
+                {displayed}
+                {typing && <span className={styles.luckyModalCursor} aria-hidden="true" />}
+              </span>
             </p>
-          </div>
-        ) : (
-          <>
-            <p className={styles.luckyModalBody}>{props.prompt}</p>
-            <p className={styles.luckyModalHint}>
-              Filling the composer and starting the workflow now.
-            </p>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </>
   );
@@ -809,7 +848,6 @@ export default function HomePage() {
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [runDetail, setRunDetail] = useState<RunDetail | null>(null);
-  const [luckyHint, setLuckyHint] = useState("");
 
   const [testInput, setTestInput] = useState("");
   const [testResults, setTestResults] = useState<TestResult[]>([]);
@@ -873,7 +911,6 @@ export default function HomePage() {
     setDurationSeconds(0);
     setDrawerOpen(false);
     setRunDetail(null);
-    setLuckyHint("");
     setLuckyPreviewPrompt("");
     setLuckyModalClosing(false);
     setTestInput("");
@@ -1006,16 +1043,14 @@ export default function HomePage() {
     if (submitting || luckyLoading) return;
 
     setLuckyLoading(true);
-    setLuckyHint("Finding a strong scope for the chatbot…");
     setLuckyPreviewPrompt("");
     setLuckyModalClosing(false);
     setError("");
     try {
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
       const result = await api.luckyPrompt();
-      setIdleStep("compose");
       setDescription(result.description);
       setLuckyPreviewPrompt(result.description);
-      setLuckyHint("Lucky pick selected. Starting the workflow…");
       await new Promise((resolve) => window.setTimeout(resolve, 5000));
       setLuckyModalClosing(true);
       await new Promise((resolve) => window.setTimeout(resolve, 420));
@@ -1024,7 +1059,6 @@ export default function HomePage() {
       pushActivity("Selected a strong starting brief", truncate(result.description, 120), "success");
       await startQuickStart(result.description, { skipAnalyzeStep: true });
     } catch (err) {
-      setLuckyHint("");
       setLuckyPreviewPrompt("");
       setLuckyModalClosing(false);
       setLuckyLoading(false);
@@ -1365,13 +1399,13 @@ export default function HomePage() {
     };
   }, [idleStep, renderedIdleStep, idleStepPhase]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.documentElement.style.overflow =
-      view === "idle" && !drawerOpen && !luckyPreviewPrompt ? "" : "hidden";
+      view === "idle" && !drawerOpen && !luckyLoading && !luckyPreviewPrompt ? "" : "hidden";
     return () => {
       document.documentElement.style.overflow = "";
     };
-  }, [view, drawerOpen, luckyPreviewPrompt]);
+  }, [view, drawerOpen, luckyLoading, luckyPreviewPrompt]);
 
   useEffect(() => {
     if (view !== "processing" || !runId) return;
@@ -1666,13 +1700,6 @@ export default function HomePage() {
               </p>
             )}
 
-            {luckyHint && !luckyPreviewPrompt && (
-              <div className={styles.luckyInlineNotice} role="status" aria-live="polite">
-                <span className={styles.luckyInlineDot} aria-hidden="true" />
-                <span>{luckyHint}</span>
-              </div>
-            )}
-
             <div className={styles.launchActions}>
               <button
                 className={styles.primaryButton}
@@ -1742,7 +1769,7 @@ export default function HomePage() {
             />
           </div>
         ) : view === "complete" ? (
-          <div className={styles.takeoverStage}>
+          <div className={`${styles.takeoverStage} ${styles.completeStage}`}>
             <ResultShell
               bestF1={bestF1}
               bestHoldoutF1={bestHoldoutF1}
