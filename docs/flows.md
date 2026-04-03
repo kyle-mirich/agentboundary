@@ -65,4 +65,4 @@ The app is intentionally unauthenticated for simplicity. Instead:
 2. The frontend sends that id on every API request.
 3. The backend scopes projects and runs by session id.
 
-This keeps the portfolio workflow low-friction while still preventing accidental cross-user state mixing.
+This keeps the open-source workflow low-friction while still preventing accidental cross-user state mixing.

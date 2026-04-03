@@ -1,25 +1,63 @@
 /* ─── Design tokens ─── */
 :root {
   --bg:         #ece7dc;
+  --bg-2:       #f1ece3;
+  --bg-3:       #ebe5da;
+  --bg-4:       #e6dfd3;
+
   --surface:    #f7f3ec;
   --surface-2:  #f1ece3;
   --surface-3:  #e7e0d5;
+  --surface-4:  #f8f4ed;
+  --surface-5:  #f4efe6;
+  --surface-6:  #f2ece3;
+  --surface-7:  #f2ece3;
+  --surface-8:  #f1ebe2;
+  --surface-9:  #efebe2;
+  --surface-10: #f4efe6;
+  --cream-1:    rgba(248, 244, 237, 0.98);
+  --cream-2:    rgba(247, 243, 236, 0.96);
+  --cream-3:    rgba(244, 239, 230, 0.92);
+  --cream-4:    rgba(242, 236, 227, 0.98);
+  --cream-5:    rgba(241, 235, 226, 0.98);
+  --cream-6:    rgba(239, 234, 226, 0.98);
+  --surface-muted: rgba(244, 239, 230, 0.92);
+  --surface-faint: rgba(255, 255, 255, 0.04);
+  --surface-faint-2: rgba(255, 255, 255, 0.08);
+  --surface-highlight: rgba(255, 255, 255, 0.5);
+  --surface-highlight-2: rgba(255, 255, 255, 0.55);
+  --surface-white-04: rgba(255, 255, 255, 0.04);
+  --surface-white-08: rgba(255, 255, 255, 0.08);
+  --surface-white-5: rgba(255, 255, 255, 0.5);
+  --surface-white-55: rgba(255, 255, 255, 0.55);
+
   --border:     rgba(34, 38, 34, 0.10);
   --border-md:  rgba(34, 38, 34, 0.14);
   --border-lg:  rgba(34, 38, 34, 0.22);
+  --border-soft: rgba(34, 38, 34, 0.08);
+  --border-lighter: rgba(34, 38, 34, 0.12);
 
   --text:       #232725;
   --text-2:     #666d66;
   --text-3:     #8a9188;
+  --text-on-dark: #fbfdff;
 
   --accent:     #6f8477;
   --accent-2:   #94a495;
   --accent-glow:rgba(111, 132, 119, 0.28);
   --accent-dim: rgba(111, 132, 119, 0.10);
+  --accent-soft: rgba(111, 132, 119, 0.12);
+  --accent-soft-2: rgba(111, 132, 119, 0.14);
+  --accent-soft-3: rgba(111, 132, 119, 0.16);
+  --accent-soft-4: rgba(111, 132, 119, 0.18);
+  --accent-soft-5: rgba(111, 132, 119, 0.20);
+  --accent-soft-6: rgba(111, 132, 119, 0.24);
 
   --green:      #567563;
   --green-dim:  rgba(86, 117, 99, 0.12);
   --green-glow: rgba(86, 117, 99, 0.22);
+  --green-strong: #42d18b;
+  --green-strong-2: #4dcd8f;
 
   --amber:      #a57b3f;
   --amber-dim:  rgba(165, 123, 63, 0.12);
@@ -30,6 +68,14 @@
 
   --blue:       #6f8477;
   --blue-dim:   rgba(111, 132, 119, 0.10);
+  --blue-soft:  #e5eefc;
+  --blue-soft-2: #dbe8fb;
+
+  --shadow-soft: rgba(63, 53, 39, 0.08);
+  --shadow-strong: rgba(63, 53, 39, 0.14);
+  --shadow-soft-2: rgba(77, 65, 47, 0.08);
+  --shadow-soft-3: rgba(77, 65, 47, 0.06);
+  --shadow-neutral: rgba(255, 255, 255, 0.5);
 
   --radius-sm:  8px;
   --radius-md:  14px;
@@ -109,11 +155,11 @@ html, body {
 body {
   overflow-x: hidden;
   -webkit-tap-highlight-color: rgba(34, 38, 34, 0.04);
-  background: #ece7dc;
+  background: var(--bg);
   background-image:
     radial-gradient(ellipse 90% 55% at 50% -10%, rgba(180, 170, 146, 0.16) 0%, transparent 65%),
     radial-gradient(ellipse 50% 35% at 85% 75%, rgba(111, 132, 119, 0.08) 0%, transparent 60%),
-    linear-gradient(180deg, #f1ece3 0%, #ebe5da 55%, #e6dfd3 100%);
+    linear-gradient(180deg, var(--bg-2) 0%, var(--bg-3) 55%, var(--bg-4) 100%);
 }
 
 /* Ambient background glow */

@@ -10,46 +10,55 @@ from .config import settings
 from .models import ExampleInput, ExampleSource, Label
 
 _SEED_PROMPT = """\
-You are generating training data for a text classifier.
+You are generating labeled training data for a text classifier.
 
-Domain: {description}
+Domain:
+{description}
 
-Generate exactly 90 labeled examples in JSON format:
-- 30 labeled "in_scope": messages clearly within the domain
-- 30 labeled "out_of_scope": messages clearly outside the domain
-- 30 labeled "ambiguous": messages that mix in-scope and out-of-scope intent
+Generate exactly 90 examples as a JSON array only. Do not include markdown, comments, or explanation.
 
-Return a JSON array only, no explanation:
-[{{"text": "...", "label": "in_scope"}}, ...]
+Label balance:
+- 30 "in_scope": clearly inside the domain and unambiguous
+- 30 "out_of_scope": clearly outside the domain and unambiguous
+- 30 "ambiguous": plausible boundary cases that could reasonably be confused
 
-Make examples realistic, varied in length, and challenging enough to require a real classifier.\
+Quality rules:
+- Write realistic end-user messages, not synthetic label descriptions.
+- Vary length, tone, wording, and intent.
+- Keep each example self-contained and specific.
+- Avoid duplicates, near-duplicates, and template-like phrasing.
+- Make ambiguous examples genuinely borderline, not obviously mixed-label spam.
+- Do not mention the labels inside the text.
+
+Return this schema only:
+[{{"text": "...", "label": "in_scope"}}, ...]\
 """
 
 _REQUEST_TIMEOUT_SECONDS = 20.0
 _SEEDS_PER_LABEL = 30
 _FALLBACK_TOPIC_LIMIT = 4
 _LUCKY_PROMPTS = [
-    "The chatbot should only handle questions about Star Wars lore, characters, timelines, and canon debates. It should not handle coding help, travel planning, or general trivia.",
-    "The chatbot should only handle feedback on startup pitches, business models, and target customers. It should not handle debugging code, entertainment picks, or personal finance advice.",
-    "The chatbot should only handle movie reviews, genre discussions, and spoiler-heavy film analysis. It should not handle billing issues, workout planning, or programming questions.",
-    "The chatbot should only handle fitness questions about training, nutrition, recovery, and injury risk. It should not handle legal advice, software troubleshooting, or vacation planning.",
-    "The chatbot should only handle questions about personal budgeting, saving habits, and monthly spending plans. It should not handle relationship advice, coding help, or travel itineraries.",
-    "The chatbot should only handle skincare routines, ingredients, and product layering. It should not handle medical diagnosis, tax questions, or laptop troubleshooting.",
-    "The chatbot should only handle meal prep, grocery planning, and beginner home cooking. It should not handle stock picks, fantasy sports, or legal forms.",
-    "The chatbot should only handle marathon training, pacing, hydration, and race prep. It should not handle visa questions, programming help, or movie recommendations.",
-    "The chatbot should only handle college essay feedback, school fit, and application strategy. It should not handle therapy, coding bugs, or restaurant recommendations.",
-    "The chatbot should only handle interior design ideas for small apartments, furniture layout, and decor choices. It should not handle contract law, debugging, or car repair advice.",
-    "The chatbot should only handle coffee brewing methods, bean selection, and espresso technique. It should not handle travel visas, resume reviews, or fantasy novels.",
-    "The chatbot should only handle gardening questions about herbs, vegetables, soil, and seasonal planting. It should not handle coding interviews, credit disputes, or pet training.",
-    "The chatbot should only handle guitar gear, pedals, amps, and tone settings. It should not handle plumbing repairs, investment advice, or airline bookings.",
-    "The chatbot should only handle chess openings, tactics, and endgame study plans. It should not handle medication guidance, app development, or celebrity gossip.",
-    "The chatbot should only handle parenting questions about toddler routines, sleep schedules, and meal ideas. It should not handle divorce law, Python code, or hotel planning.",
-    "The chatbot should only handle fashion advice about outfits, wardrobe basics, and seasonal styling. It should not handle crypto trading, database tuning, or immigration paperwork.",
-    "The chatbot should only handle language learning plans, study routines, and pronunciation practice. It should not handle product returns, legal contracts, or software setup.",
-    "The chatbot should only handle board game rules, strategy, and player count recommendations. It should not handle tax filing, backend debugging, or workout injuries.",
-    "The chatbot should only handle hiking trip prep, trail essentials, and gear packing. It should not handle coding tasks, airline refunds, or skincare routines.",
-    "The chatbot should only handle wedding planning timelines, vendor checklists, and guest logistics. It should not handle legal disputes, machine learning code, or fantasy football picks.",
-    "The chatbot should only handle nonfiction book recommendations, reading order, and note-taking methods. It should not handle tax optimization, coding errors, or recipe substitutions.",
+    "The chatbot should handle questions about Star Wars lore, characters, timelines, and canon debates.",
+    "The chatbot should handle feedback on startup pitches, business models, and target customers.",
+    "The chatbot should handle movie reviews, genre discussions, and spoiler-heavy film analysis.",
+    "The chatbot should handle fitness questions about training, nutrition, recovery, and injury risk.",
+    "The chatbot should handle personal budgeting, saving habits, and monthly spending plans.",
+    "The chatbot should handle skincare routines, ingredients, and product layering.",
+    "The chatbot should handle meal prep, grocery planning, and beginner home cooking.",
+    "The chatbot should handle marathon training, pacing, hydration, and race prep.",
+    "The chatbot should handle college essay feedback, school fit, and application strategy.",
+    "The chatbot should handle interior design ideas for small apartments, furniture layout, and decor choices.",
+    "The chatbot should handle coffee brewing methods, bean selection, and espresso technique.",
+    "The chatbot should handle gardening questions about herbs, vegetables, soil, and seasonal planting.",
+    "The chatbot should handle guitar gear, pedals, amps, and tone settings.",
+    "The chatbot should handle chess openings, tactics, and endgame study plans.",
+    "The chatbot should handle parenting questions about toddler routines, sleep schedules, and meal ideas.",
+    "The chatbot should handle fashion advice about outfits, wardrobe basics, and seasonal styling.",
+    "The chatbot should handle language learning plans, study routines, and pronunciation practice.",
+    "The chatbot should handle board game rules, strategy, and player count recommendations.",
+    "The chatbot should handle hiking trip prep, trail essentials, and gear packing.",
+    "The chatbot should handle wedding planning timelines, vendor checklists, and guest logistics.",
+    "The chatbot should handle nonfiction book recommendations, reading order, and note-taking methods.",
 ]
 _DEFAULT_TOPICS = ["billing", "refunds", "account access", "login issues"]
 _OUT_OF_SCOPE_TOPICS = [

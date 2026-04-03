@@ -1117,7 +1117,7 @@ export default function ProjectPage() {
                 rows={4}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type a support message to classify…"
+                placeholder="Type a support message about the allowed topics…"
                 style={{ fontSize: "0.85rem" }}
               />
             </div>
@@ -1128,8 +1128,8 @@ export default function ProjectPage() {
               style={{ width: "100%", justifyContent: "center" }}
             >
               {classifying
-                ? <><span className="spinner spinner-sm" /> Classifying…</>
-                : "Classify →"
+                ? <><span className="spinner spinner-sm" /> Checking…</>
+                : "Check message →"
               }
             </button>
           </form>

@@ -29,7 +29,7 @@ FastAPI API
 
 ## Frontend Responsibilities
 
-The frontend in `web/` is a portfolio-first interface with two core views:
+The frontend in `web/` is an open-source interface with two core views:
 
 - the landing experience for quickly defining a classifier brief
 - the project workspace for seed management, live run monitoring, and classifier testing

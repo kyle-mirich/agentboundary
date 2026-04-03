@@ -4,7 +4,7 @@
 
 Agent Boundary supports two persistence modes:
 
-- SQLite by default for local development, tests, and portfolio review
+- SQLite by default for local development, tests, and open-source review
 - PostgreSQL for shared and production deployments
 
 If `DATABASE_URL` is unset, the API creates and uses `api/data/app.db`.

@@ -774,9 +774,11 @@ def _build_subagents() -> list[dict[str, Any]]:
             "name": "ExperimentReviewer",
             "description": "Review evaluation results, analyze misclassifications, and write recommendations into /workspace/reviews.",
             "system_prompt": (
-                "You review classifier evaluation reports. Read round evaluation files, identify systematic errors, "
-                "and write concise Markdown recommendations to the requested /workspace review path. Recommend stopping "
-                "when metrics meet target or when there is no concrete next dataset intervention."
+                "You are the classifier review specialist. Inspect the round evaluation file and the holdout evaluation file, "
+                "compare the mistakes, and write a concise Markdown review to the requested /workspace/reviews path. "
+                "Lead with the most important failure mode, cite the evidence from the files, and end with 1-3 concrete next "
+                "dataset interventions. If the round is already strong or no specific intervention is justified, say so plainly "
+                "and recommend stopping."
             ),
             "tools": [],
         },
@@ -882,8 +884,8 @@ class DeepAgentRunner:
                 backend=backend_factory,
                 checkpointer=InMemorySaver(),
                 system_prompt=(
-                    "You orchestrate bounded classifier experiments. Use the planning tool, filesystem, and subagents carefully. "
-                    "Keep intermediate artifacts in /workspace and keep context concise."
+                    "You orchestrate bounded classifier experiments. Use the planning tool, filesystem, and subagents deliberately. "
+                    "Keep intermediate artifacts in /workspace, keep the active plan current, and keep context tight."
                 ),
             )
             rounds = max_rounds or project.max_rounds
@@ -899,7 +901,7 @@ class DeepAgentRunner:
             self._emit(run_id, "plan_ready", "Strategy planned", {"round_budget": rounds})
 
             prompt = f"""
-You are the orchestrator for a generic in-scope classifier experiment.
+You are the orchestrator for an in-scope classifier experiment.
 
 Project:
 - name: {project.name}
@@ -908,19 +910,17 @@ Project:
 - disallowed_topics: {project.disallowed_topics}
 - routing_notes: {project.routing_notes}
 
-Requirements:
-1. Treat the initial human seed set as the default training dataset. Do not invent bulk augmentation unless there is a concrete failure mode to address.
-2. For round 1, call generate_candidates with an empty focus_note so the fixed baseline dataset is preserved, then call run_round exactly once. Do not call any lower-level train/evaluate steps directly.
-3. For later rounds, only call generate_candidates when the reviewer identifies a specific weakness or boundary issue worth targeting. If there is no concrete intervention, stop rather than generating more generic data.
-4. After run_round, call create_holdout using the current dataset characteristics and a reasonable holdout size, then call evaluate_holdout on that file.
-5. Ask ExperimentReviewer to read both the standard evaluation file and the holdout evaluation file, write a review to /workspace/reviews/round-XX-review.md, then call record_review.
-6. Update your todo list and keep plan.md current.
-7. Complete every planned round. Do not stop early, even if a target is met or the first two rounds look strong.
-8. Only after all {rounds} rounds are complete, compare the finished rounds, choose the single strongest checkpoint, write a full Markdown summary to /workspace/reports/final-summary.md using write_final_summary, and then promote that checkpoint.
-9. The final summary must include: a round-by-round timeline, key metrics for each round, the main intervention or focus note per round when available, and a direct explanation of why the selected round beat the other completed rounds.
-10. The final decision must explain why the selected round beats the other completed rounds.
+Operating rules:
+1. Treat the human seed set as the baseline training data. Do not invent bulk augmentation unless there is a concrete failure mode to address.
+2. Round 1 must use generate_candidates with an empty focus_note, then run exactly one round. Do not call lower-level train or evaluate steps directly.
+3. For later rounds, generate candidates only when the reviewer identifies a specific weakness or boundary issue. If there is no concrete intervention, stop adding synthetic data and proceed with the existing dataset.
+4. After every round, create a new holdout file from the current dataset, evaluate it, and ask ExperimentReviewer for a short Markdown review that covers both the standard evaluation and the holdout evaluation.
+5. Keep /workspace/plan.md current with the active round, the current hypothesis, and the next concrete action.
+6. Complete the full round budget. Do not stop early just because a target was met.
+7. After all {rounds} rounds finish, compare the completed rounds, select the strongest checkpoint, write /workspace/reports/final-summary.md with a round-by-round timeline, key metrics, the focus or intervention per round, and a direct comparison explaining why the winner beat the others.
+8. Then promote the selected checkpoint.
 
-Use round numbers starting at 1 and keep summaries concise.
+Be concise, concrete, and tool-driven. Use round numbers starting at 1.
 """
 
             config = {"configurable": {"thread_id": run_id}}

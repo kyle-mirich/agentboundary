@@ -1,6 +1,6 @@
 # Agent Boundary
 
-Agent Boundary is a portfolio-grade full-stack project for building an in-scope text classifier end to end. A Next.js frontend walks a user through defining what counts as in scope, generating labeled seeds, launching a Deep Agents-driven experiment run, reviewing training rounds, and testing the promoted classifier live.
+Agent Boundary is an open-source full-stack project for building an in-scope text classifier end to end. A Next.js frontend walks a user through defining what counts as in scope, generating labeled seeds, launching a Deep Agents-driven experiment run, reviewing training rounds, and testing the promoted classifier live.
 
 The project is intentionally opinionated:
 
@@ -12,7 +12,7 @@ The project is intentionally opinionated:
 
 - Deep Agents is used for bounded experiment planning and review, not as a vague chat wrapper.
 - The backend couples deterministic PyTorch training with agent-driven dataset iteration.
-- The UI is designed as a presentable product experience instead of an internal admin surface.
+- The UI is designed as a polished product experience instead of an internal admin surface.
 - The repo now includes CI, reproducible local commands, and supporting architecture and deployment docs.
 
 ## Tech Stack
@@ -144,4 +144,4 @@ Detailed deployment notes live in `docs/deployment.md`.
 
 - The local backend now bootstraps its own schema, so reviewers do not need a pre-existing database to run tests.
 - The classifier seed generation path is aligned across product copy, tests, and implementation at 90 examples per quick-start run.
-- The repository is intentionally scoped as a portfolio project, so the focus is clarity, end-to-end flow, and code quality over enterprise-level feature breadth.
+- The repository is intentionally scoped as an open-source project, so the focus is clarity, end-to-end flow, and code quality over enterprise-level feature breadth.

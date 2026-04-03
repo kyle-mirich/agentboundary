@@ -560,6 +560,7 @@ function LuckyPromptModal(props: { prompt: string; loading: boolean; closing: bo
 function TraceDrawer(props: {
   open: boolean;
   onClose: () => void;
+  description: string;
   rounds: RoundSummary[];
   bestRoundIndex: number | null;
   bestF1: number | null;
@@ -574,6 +575,8 @@ function TraceDrawer(props: {
     ? props.runDetail.events
     : props.liveEvents;
   const holdoutSummary = formatPayload(props.runDetail?.holdout_summary);
+  const roundCount = props.rounds.length;
+  const eventCount = traceEvents.length;
 
   return (
     <>
@@ -583,149 +586,180 @@ function TraceDrawer(props: {
         onClick={props.onClose}
         type="button"
       />
-      <aside className={styles.drawer} aria-label="Training trace" role="dialog">
-        <div className={styles.drawerHeader}>
-          <div>
-            <p className={styles.panelLabel}>Training trace</p>
-            <h2 className={styles.drawerTitle}>Full process details</h2>
-          </div>
-          <button className={styles.drawerClose} onClick={props.onClose} type="button">
-            Close
-          </button>
-        </div>
-
-        <div className={styles.drawerBody}>
-          <details className={styles.traceDisclosure} open>
-            <summary className={styles.traceSummary}>
-              <span className={styles.traceHeading}>Overview</span>
-              <span className={styles.traceSummaryMeta}>Key metrics</span>
-            </summary>
-            <div className={styles.tracePanelBody}>
-              <div className={styles.summaryCard}>
-                <div className={styles.summaryRow}>
-                  <span>Best F1</span>
-                  <strong>{formatMetric(props.bestF1)}</strong>
-                </div>
-                <div className={styles.summaryRow}>
-                  <span>Examples generated</span>
-                  <strong>{props.exampleCount}</strong>
-                </div>
-                <div className={styles.summaryRow}>
-                  <span>Best round</span>
-                  <strong>
-                    {props.bestRoundIndex != null ? `Round ${props.bestRoundIndex}` : "—"}
-                  </strong>
-                </div>
-              </div>
-              {holdoutSummary && <pre className={styles.traceCode}>{holdoutSummary}</pre>}
+      <aside className={styles.drawer} aria-label="Training trace" aria-modal="true" role="dialog">
+        <div className={styles.drawerShell}>
+          <header className={styles.drawerHeader}>
+            <div className={styles.drawerHeaderCopy}>
+              <p className={styles.panelLabel}>Training trace</p>
+              <h2 className={styles.drawerTitle}>Review the run end to end</h2>
+              <p className={styles.drawerIntro}>
+                Step back through the original prompt, generated plan, event timeline, and model
+                results without leaving the modal.
+              </p>
             </div>
-          </details>
+            <button className={styles.drawerClose} onClick={props.onClose} type="button">
+              Close
+            </button>
+          </header>
 
-          {props.rounds.length > 0 && (
+          <section className={styles.traceHero} aria-label="Original prompt summary">
+            <div className={styles.traceHeroCopy}>
+              <span className={styles.traceHeroLabel}>Original prompt</span>
+              <p className={styles.traceHeroPrompt}>{props.description || "No brief captured."}</p>
+            </div>
+            <div className={styles.traceHeroStats}>
+              <div className={styles.traceHeroStat}>
+                <span className={styles.traceHeroStatLabel}>Best F1</span>
+                <strong className={styles.traceHeroStatValue}>{formatMetric(props.bestF1)}</strong>
+              </div>
+              <div className={styles.traceHeroStat}>
+                <span className={styles.traceHeroStatLabel}>Examples</span>
+                <strong className={styles.traceHeroStatValue}>{props.exampleCount}</strong>
+              </div>
+              <div className={styles.traceHeroStat}>
+                <span className={styles.traceHeroStatLabel}>Rounds</span>
+                <strong className={styles.traceHeroStatValue}>{roundCount}</strong>
+              </div>
+              <div className={styles.traceHeroStat}>
+                <span className={styles.traceHeroStatLabel}>Events</span>
+                <strong className={styles.traceHeroStatValue}>{eventCount}</strong>
+              </div>
+            </div>
+          </section>
+
+          <div className={styles.drawerBody}>
             <details className={styles.traceDisclosure} open>
               <summary className={styles.traceSummary}>
-                <span className={styles.traceHeading}>Round metrics</span>
-                <span className={styles.traceSummaryMeta}>{props.rounds.length} rounds</span>
+                <span className={styles.traceHeading}>Overview</span>
+                <span className={styles.traceSummaryMeta}>Key metrics</span>
               </summary>
               <div className={styles.tracePanelBody}>
-                <table className={styles.traceTable}>
-                  <thead>
-                    <tr>
-                      <th>Round</th>
-                      <th>Train F1</th>
-                      <th>Holdout F1</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {props.rounds.map((round) => (
-                      <tr key={round.index}>
-                        <td>
-                          Round {round.index}
-                          {props.bestRoundIndex === round.index && (
-                            <span className={styles.bestTag}>Best</span>
-                          )}
-                        </td>
-                        <td>{formatMetric(round.trainF1)}</td>
-                        <td>{formatMetric(round.holdoutF1)}</td>
+                <div className={styles.summaryCard}>
+                  <div className={styles.summaryRow}>
+                    <span>Best F1</span>
+                    <strong>{formatMetric(props.bestF1)}</strong>
+                  </div>
+                  <div className={styles.summaryRow}>
+                    <span>Examples generated</span>
+                    <strong>{props.exampleCount}</strong>
+                  </div>
+                  <div className={styles.summaryRow}>
+                    <span>Best round</span>
+                    <strong>
+                      {props.bestRoundIndex != null ? `Round ${props.bestRoundIndex}` : "—"}
+                    </strong>
+                  </div>
+                </div>
+                {holdoutSummary && <pre className={styles.traceCode}>{holdoutSummary}</pre>}
+              </div>
+            </details>
+
+            {props.rounds.length > 0 && (
+              <details className={styles.traceDisclosure} open>
+                <summary className={styles.traceSummary}>
+                  <span className={styles.traceHeading}>Round metrics</span>
+                  <span className={styles.traceSummaryMeta}>{props.rounds.length} rounds</span>
+                </summary>
+                <div className={styles.tracePanelBody}>
+                  <table className={styles.traceTable}>
+                    <thead>
+                      <tr>
+                        <th>Round</th>
+                        <th>Train F1</th>
+                        <th>Holdout F1</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </details>
-          )}
-
-          {traceEvents.length > 0 && (
-            <details className={styles.traceDisclosure} open>
-              <summary className={styles.traceSummary}>
-                <span className={styles.traceHeading}>Event timeline</span>
-                <span className={styles.traceSummaryMeta}>{traceEvents.length} events</span>
-              </summary>
-              <div className={styles.tracePanelBody}>
-                <div className={styles.traceEventList}>
-                  {traceEvents.map((event) => {
-                    const payload = formatPayload(event.payload);
-                    return (
-                      <details className={styles.traceEventItem} key={event.id}>
-                        <summary className={styles.traceEventSummary}>
-                          <div className={styles.traceEventTop}>
-                            <span className={styles.traceEventType}>
-                              {formatEventTypeLabel(event.event_type)}
-                            </span>
-                            <span className={styles.traceEventTime}>
-                              {formatClock(event.created_at)}
-                            </span>
-                          </div>
-                          <p className={styles.traceEventMessage}>
-                            {event.message || "No event message captured."}
-                          </p>
-                        </summary>
-                        {payload && <pre className={styles.traceCode}>{payload}</pre>}
-                      </details>
-                    );
-                  })}
+                    </thead>
+                    <tbody>
+                      {props.rounds.map((round) => (
+                        <tr key={round.index}>
+                          <td>
+                            Round {round.index}
+                            {props.bestRoundIndex === round.index && (
+                              <span className={styles.bestTag}>Best</span>
+                            )}
+                          </td>
+                          <td>{formatMetric(round.trainF1)}</td>
+                          <td>{formatMetric(round.holdoutF1)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            </details>
-          )}
+              </details>
+            )}
 
-          {props.runDetail?.plan_markdown && (
+            {traceEvents.length > 0 && (
+              <details className={styles.traceDisclosure} open>
+                <summary className={styles.traceSummary}>
+                  <span className={styles.traceHeading}>Event timeline</span>
+                  <span className={styles.traceSummaryMeta}>{traceEvents.length} events</span>
+                </summary>
+                <div className={styles.tracePanelBody}>
+                  <div className={styles.traceEventList}>
+                    {traceEvents.map((event) => {
+                      const payload = formatPayload(event.payload);
+                      return (
+                        <details className={styles.traceEventItem} key={event.id}>
+                          <summary className={styles.traceEventSummary}>
+                            <div className={styles.traceEventTop}>
+                              <span className={styles.traceEventType}>
+                                {formatEventTypeLabel(event.event_type)}
+                              </span>
+                              <span className={styles.traceEventTime}>
+                                {formatClock(event.created_at)}
+                              </span>
+                            </div>
+                            <p className={styles.traceEventMessage}>
+                              {event.message || "No event message captured."}
+                            </p>
+                          </summary>
+                          {payload && <pre className={styles.traceCode}>{payload}</pre>}
+                        </details>
+                      );
+                    })}
+                  </div>
+                </div>
+              </details>
+            )}
+
+            {props.runDetail?.plan_markdown && (
+              <details className={styles.traceDisclosure}>
+                <summary className={styles.traceSummary}>
+                  <span className={styles.traceHeading}>Run plan</span>
+                  <span className={styles.traceSummaryMeta}>Prompt + structure</span>
+                </summary>
+                <div className={styles.tracePanelBody}>
+                  <pre className={styles.traceCode}>{props.runDetail.plan_markdown}</pre>
+                </div>
+              </details>
+            )}
+
+            {props.runDetail?.review_markdown && (
+              <details className={styles.traceDisclosure}>
+                <summary className={styles.traceSummary}>
+                  <span className={styles.traceHeading}>Final review</span>
+                  <span className={styles.traceSummaryMeta}>Model selection</span>
+                </summary>
+                <div className={styles.tracePanelBody}>
+                  <pre className={styles.traceCode}>{props.runDetail.review_markdown}</pre>
+                </div>
+              </details>
+            )}
+
             <details className={styles.traceDisclosure}>
               <summary className={styles.traceSummary}>
-                <span className={styles.traceHeading}>Run plan</span>
-                <span className={styles.traceSummaryMeta}>Prompt + structure</span>
+                <span className={styles.traceHeading}>System log</span>
+                <span className={styles.traceSummaryMeta}>
+                  {props.logLines.length > 0 ? `${props.logLines.length} lines` : "No logs"}
+                </span>
               </summary>
               <div className={styles.tracePanelBody}>
-                <pre className={styles.traceCode}>{props.runDetail.plan_markdown}</pre>
+                <pre className={styles.traceCode}>
+                  {props.logLines.length > 0 ? props.logLines.join("\n") : "No log lines captured."}
+                </pre>
               </div>
             </details>
-          )}
-
-          {props.runDetail?.review_markdown && (
-            <details className={styles.traceDisclosure}>
-              <summary className={styles.traceSummary}>
-                <span className={styles.traceHeading}>Final review</span>
-                <span className={styles.traceSummaryMeta}>Model selection</span>
-              </summary>
-              <div className={styles.tracePanelBody}>
-                <pre className={styles.traceCode}>{props.runDetail.review_markdown}</pre>
-              </div>
-            </details>
-          )}
-
-          <details className={styles.traceDisclosure}>
-            <summary className={styles.traceSummary}>
-              <span className={styles.traceHeading}>System log</span>
-              <span className={styles.traceSummaryMeta}>
-                {props.logLines.length > 0 ? `${props.logLines.length} lines` : "No logs"}
-              </span>
-            </summary>
-            <div className={styles.tracePanelBody}>
-              <pre className={styles.traceCode}>
-                {props.logLines.length > 0 ? props.logLines.join("\n") : "No log lines captured."}
-              </pre>
-            </div>
-          </details>
+          </div>
         </div>
       </aside>
     </>
@@ -1260,6 +1294,24 @@ export default function HomePage() {
   }, [drawerOpen]);
 
   useEffect(() => {
+    if (!drawerOpen) return;
+
+    const bodyOverflow = document.body.style.overflow;
+    const bodyOverscroll = document.body.style.overscrollBehavior;
+    const htmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = bodyOverflow;
+      document.body.style.overscrollBehavior = bodyOverscroll;
+      document.documentElement.style.overflow = htmlOverflow;
+    };
+  }, [drawerOpen]);
+
+  useEffect(() => {
     if (view === "processing") {
       const interval = window.setInterval(() => {
         if (!startedAtRef.current) return;
@@ -1586,7 +1638,7 @@ export default function HomePage() {
           <div className={styles.launchPanel}>
             <div className={styles.launchHeader}>
               <div>
-                <h3 className={styles.cardTitle}>What should the chatbot handle?</h3>
+                <h3 className={styles.cardTitle}>What topics should the chatbot cover?</h3>
               </div>
             </div>
 
@@ -1600,7 +1652,7 @@ export default function HomePage() {
               rows={5}
               autoComplete="off"
               name="classifier_description"
-              placeholder="Classify questions about Star Wars lore, characters, timelines, and canon debates…"
+              placeholder="Questions about Star Wars lore, characters, timelines, and canon debates…"
               value={description}
               onChange={(event) => {
                 setDescription(event.target.value);
@@ -1732,6 +1784,7 @@ export default function HomePage() {
           bestF1={bestF1}
           bestRoundIndex={bestRoundIndex}
           exampleCount={exampleCount}
+          description={description}
           liveEvents={liveEvents}
           logLines={logLines}
           onClose={() => setDrawerOpen(false)}
