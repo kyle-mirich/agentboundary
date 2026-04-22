@@ -1498,25 +1498,19 @@ export default function HomePage() {
                   <p className={styles.welcomeKicker}>Kyle Mirich · AI Engineer</p>
                   <p className={styles.welcomeBrandName}>Agent Boundary</p>
                   <p className={styles.welcomeSubhead}>
-                    A scope classifier that screens out off-topic chats before they reach a
-                    customer-facing bot or human support agent.
+                    Scope filtering for LLMs and support bots.
                   </p>
                 </div>
               </div>
 
               <div className={styles.welcomeCopy}>
-                <p className={styles.welcomeEyebrow}>Agent scope boundary</p>
-                <h1 className={styles.welcomeTitle}>Keep agents on topic.</h1>
+                <h1 className={styles.welcomeTitle}>Keep your chatbot on topic.</h1>
                 <p className={styles.welcomeBody}>
-                  Agent Boundary runs a self-improving loop that generates examples, trains
-                  across multiple rounds, compares checkpoints, and deploys the strongest
-                  classifier as the boundary layer in front of support.
+                  A self-improving loop that trains a classifier to stop off-topic
+                  messages before they hit your LLM. Describe the scope in plain English.
+                  The agent generates the dataset, trains, evaluates, and promotes the best
+                  checkpoint.
                 </p>
-                <ul className={styles.welcomeProofList}>
-                  <li className={styles.welcomeProofItem}>Generates labeled data from a scope definition</li>
-                  <li className={styles.welcomeProofItem}>Fine-tunes a BERT classifier across multiple rounds and compares checkpoints</li>
-                  <li className={styles.welcomeProofItem}>Serves the best classifier for production screening</li>
-                </ul>
               </div>
             </div>
 
@@ -1529,10 +1523,9 @@ export default function HomePage() {
                   aria-label="Define scope step details"
                 >
                   <div className={styles.stepNumber}>1</div>
-                  <div className={styles.stepLabel}>Define scope</div>
+                  <div className={styles.stepLabel}>Understand</div>
                   <div className={styles.hoverTooltip} role="tooltip">
-                    Write the in-scope behavior you want the classifier to learn. This prompt
-                    becomes the source for synthetic examples and labeling rules.
+                    Expand the brief into a taxonomy with three concrete labels.
                   </div>
                 </div>
                 <div className={styles.stepConnector}></div>
@@ -1543,11 +1536,9 @@ export default function HomePage() {
                   aria-label="Generate examples step details"
                 >
                   <div className={styles.stepNumber}>2</div>
-                  <div className={styles.stepLabel}>Generate examples</div>
+                  <div className={styles.stepLabel}>Generate</div>
                   <div className={styles.hoverTooltip} role="tooltip">
-                    The pipeline expands the scope definition into labeled on-topic and
-                    off-topic examples so the model has training data before any fine-tuning
-                    run starts.
+                    Synthesize ~240 balanced examples with a holdout split.
                   </div>
                 </div>
                 <div className={styles.stepConnector}></div>
@@ -1558,10 +1549,9 @@ export default function HomePage() {
                   aria-label="Train classifier step details"
                 >
                   <div className={styles.stepNumber}>3</div>
-                  <div className={styles.stepLabel}>Train classifier</div>
+                  <div className={styles.stepLabel}>Train</div>
                   <div className={styles.hoverTooltip} role="tooltip">
-                    Each round fine-tunes the classifier, evaluates checkpoints, and keeps the
-                    strongest model. The score shown in the example comes back from this model.
+                    Fit an embedding + classifier head. 30–90 seconds per round.
                   </div>
                 </div>
                 <div className={styles.stepConnector}></div>
@@ -1569,13 +1559,12 @@ export default function HomePage() {
                   className={styles.welcomeStep}
                   role="note"
                   tabIndex={0}
-                  aria-label="Deploy boundary step details"
+                  aria-label="Refine step details"
                 >
                   <div className={styles.stepNumber}>4</div>
-                  <div className={styles.stepLabel}>Deploy boundary</div>
+                  <div className={styles.stepLabel}>Refine</div>
                   <div className={styles.hoverTooltip} role="tooltip">
-                    Deployment here means serving the trained classifier as a boundary service
-                    other products can call before they handle the request.
+                    Add hard cases, retrain, promote the best checkpoint.
                   </div>
                 </div>
               </div>
@@ -1629,7 +1618,7 @@ export default function HomePage() {
                   onClick={() => setIdleStep("compose")}
                   type="button"
                 >
-                  <span className={styles.buttonLabel}>Start Live Training</span>
+                  <span className={styles.buttonLabel}>Begin a run →</span>
                 </button>
               </div>
 
@@ -1662,20 +1651,14 @@ export default function HomePage() {
           </header>
 
           <div className={styles.composerCopy}>
-            <p className={styles.composerTitle}>Describe what belongs in scope.</p>
+            <p className={styles.composerTitle}>What should stay inside the fence?</p>
             <p className={styles.composerBody}>
-              One sentence is enough. The guided workflow will generate examples, train the
-              model, and reveal the final classifier.
+              Describe the scope in your own words. The agent translates it into a taxonomy.
+              You can edit the examples later if it missed something.
             </p>
           </div>
 
           <div className={styles.launchPanel}>
-            <div className={styles.launchHeader}>
-              <div>
-                <h3 className={styles.cardTitle}>What topics should the chatbot cover?</h3>
-              </div>
-            </div>
-
             <label className="sr-only" htmlFor="classifier-description">
               Classifier description
             </label>
@@ -1686,7 +1669,7 @@ export default function HomePage() {
               rows={5}
               autoComplete="off"
               name="classifier_description"
-              placeholder="Questions about Star Wars lore, characters, timelines, and canon debates…"
+              placeholder="Customer support for a food-delivery app. Accept orders, tracking, refunds, driver ETA, account and payment issues, menu and allergen questions. Reject recipes, jokes, coding help, general chit-chat."
               value={description}
               onChange={(event) => {
                 setDescription(event.target.value);
@@ -1700,6 +1683,27 @@ export default function HomePage() {
               </p>
             )}
 
+            <div className={styles.composerExamples}>
+              {[
+                { label: "Community bank", body: "Accounts, transfers, cards. No stock tips or financial advice." },
+                { label: "Telehealth intake", body: "Symptoms and appointments. No prescriptions or diagnoses." },
+                { label: "HR onboarding", body: "Benefits, payroll, time off. No legal advice." },
+              ].map((chip) => (
+                <button
+                  key={chip.label}
+                  className={styles.composerExampleChip}
+                  onClick={() => {
+                    setDescription(`${chip.label} — ${chip.body}`);
+                    if (error) setError("");
+                  }}
+                  type="button"
+                >
+                  <span className={styles.composerExampleChipLabel}>{chip.label}</span>
+                  <span className={styles.composerExampleChipBody}>{chip.body}</span>
+                </button>
+              ))}
+            </div>
+
             <div className={styles.launchActions}>
               <button
                 className={styles.primaryButton}
@@ -1707,7 +1711,7 @@ export default function HomePage() {
                 onClick={() => void handleSubmit()}
                 type="button"
               >
-                <span className={styles.buttonLabel}>Build classifier</span>
+                <span className={styles.buttonLabel}>Begin a run →</span>
                 {submitting && <span className={styles.buttonSpinner} aria-hidden="true" />}
               </button>
 

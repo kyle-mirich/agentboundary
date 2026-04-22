@@ -210,6 +210,10 @@
   font-weight: 500;
   text-decoration: none;
   transition: color 200ms ease-out;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 .landingNavLink:hover,
@@ -1072,6 +1076,45 @@
 .launchActions {
   align-items: stretch;
   flex-wrap: wrap;
+}
+
+.composerExamples {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.composerExampleChip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.composerExampleChip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.composerExampleChipLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, rgba(255, 255, 255, 0.5));
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.composerExampleChipBody {
+  font-size: 13px;
+  color: var(--color-text, rgba(255, 255, 255, 0.8));
+  line-height: 1.4;
 }
 
 .primaryButton,
@@ -3114,9 +3157,15 @@
   }
 
   .resultCard {
-    height: calc(100svh - 24px);
-    max-height: calc(100svh - 24px);
+    height: auto;
+    max-height: none;
+    overflow: visible;
     padding: 18px 16px 16px;
+  }
+
+  .resultSurface {
+    overflow-y: visible;
+    min-height: 0;
   }
 }
 
