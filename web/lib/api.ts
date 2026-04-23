@@ -69,6 +69,7 @@ export type RunDetail = Run & {
   rounds: Round[];
   plan_markdown: string;
   review_markdown: string;
+  final_summary_markdown: string;
   holdout_summary: Record<string, unknown>;
   events: RunEvent[];
 };

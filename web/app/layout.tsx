@@ -1,30 +1,8 @@
 import "./globals.css";
 import "./demo-v2.css";
-import { Syne, DM_Sans, JetBrains_Mono } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 
-const syne = Syne({
-  subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["400", "500", "600", "700", "800"],
-  display: "swap",
-});
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  variable: "--font-body",
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  weight: ["400", "500", "700"],
-  display: "swap",
-});
-
 export const metadata: Metadata = {
-  metadataBase: new URL("https://example.com"),
   title: "Agent Boundary",
   description:
     "Portfolio project for designing, training, and evaluating the Agent Boundary scope classifier with Deep Agents, FastAPI, and Next.js.",
@@ -59,7 +37,16 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${syne.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang="en"
+      style={
+        {
+          "--font-display": '"Avenir Next", "Segoe UI", sans-serif',
+          "--font-body": '"Avenir Next", "Segoe UI", sans-serif',
+          "--font-mono": '"SFMono-Regular", "SF Mono", "JetBrains Mono", monospace',
+        } as React.CSSProperties
+      }
+    >
       <body>
         {children}
       </body>

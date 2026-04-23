@@ -370,19 +370,33 @@ function ResultShell(props: {
             </div>
           </div>
 
-          <div className={styles.resultMiniMetrics} style={{ background: "rgba(0,0,0,0.03)", padding: "12px 16px", borderRadius: "14px" }}>
-            <span><strong>F1</strong> {formatMetric(props.bestF1)}</span>
-            <span style={{ opacity: 0.3 }}>|</span>
-            <span><strong>Holdout F1</strong> {formatMetric(props.bestHoldoutF1)}</span>
-            <span style={{ opacity: 0.3 }}>|</span>
-            <span><strong>Dataset</strong> {props.exampleCount} examples</span>
-            <span style={{ opacity: 0.3 }}>|</span>
-            <span><strong>Runtime</strong> {formatDuration(props.durationSeconds)}</span>
-            <span style={{ opacity: 0.3 }}>|</span>
-            <span><strong>Promotion</strong> {props.bestRoundIndex != null ? `Round ${props.bestRoundIndex} after 3 rounds` : "Pending"}</span>
+          <div className={styles.resultMiniMetrics}>
+            <div className={styles.resultMiniMetric}>
+              <span className={styles.resultMiniMetricLabel}>Macro F1</span>
+              <strong className={styles.resultMiniMetricValue}>{formatMetric(props.bestF1)}</strong>
+            </div>
+            <div className={styles.resultMiniMetric}>
+              <span className={styles.resultMiniMetricLabel}>Holdout F1</span>
+              <strong className={styles.resultMiniMetricValue}>{formatMetric(props.bestHoldoutF1)}</strong>
+            </div>
+            <div className={styles.resultMiniMetric}>
+              <span className={styles.resultMiniMetricLabel}>Examples</span>
+              <strong className={styles.resultMiniMetricValue}>{props.exampleCount}</strong>
+            </div>
+            <div className={styles.resultMiniMetric}>
+              <span className={styles.resultMiniMetricLabel}>Runtime</span>
+              <strong className={styles.resultMiniMetricValue}>{formatDuration(props.durationSeconds)}</strong>
+            </div>
+            <div className={styles.resultMiniMetric}>
+              <span className={styles.resultMiniMetricLabel}>Best round</span>
+              <strong className={styles.resultMiniMetricValue}>{props.bestRoundIndex != null ? `Round ${props.bestRoundIndex}` : "—"}</strong>
+            </div>
           </div>
 
           <div className={styles.resultComposer}>
+            <label className="sr-only" htmlFor="classifier-test-input">
+              Support message to test against the promoted classifier
+            </label>
             <div className={styles.composerRow}>
               <input
                 id="classifier-test-input"
@@ -785,6 +799,18 @@ function TraceDrawer(props: {
               </details>
             )}
 
+            {props.runDetail?.final_summary_markdown && (
+              <details className={styles.traceDisclosure}>
+                <summary className={styles.traceSummary}>
+                  <span className={styles.traceHeading}>Experiment summary</span>
+                  <span className={styles.traceSummaryMeta}>Round-by-round outcome</span>
+                </summary>
+                <div className={styles.tracePanelBody}>
+                  <pre className={styles.traceCode}>{props.runDetail.final_summary_markdown}</pre>
+                </div>
+              </details>
+            )}
+
             <details className={styles.traceDisclosure}>
               <summary className={styles.traceSummary}>
                 <span className={styles.traceHeading}>System log</span>
@@ -1029,7 +1055,7 @@ export default function HomePage() {
     const trimmed = description.trim();
     if (!trimmed || submitting || luckyLoading) {
       if (!trimmed) {
-        setError("Add a classifier brief to start the workflow.");
+        setError("Describe a scope to continue.");
         descriptionRef.current?.focus();
       }
       return;
@@ -1584,14 +1610,14 @@ export default function HomePage() {
                       tabIndex={0}
                       aria-label="User message classification details"
                     >
-                      Can you help me build a Python script to automate my workflow?
+                      Can you write me a poem about pizza?
                       <span className={styles.classificationBadge}>
-                        <span className={styles.classificationValue}>73% Off Topic</span>
+                        <span className={styles.classificationValue}>94% Off Topic</span>
                         <div
                           className={`${styles.hoverTooltip} ${styles.hoverTooltipWide}`}
                           role="tooltip"
-                        >
-                          User prompt gets sent to the classifier (what we are building).
+                          >
+                          User message is sent to the classifier before the bot ever sees it.
                         </div>
                       </span>
                     </div>
@@ -1603,10 +1629,9 @@ export default function HomePage() {
                     tabIndex={0}
                     aria-label="Agent response details"
                   >
-                    I'm here to only help with questions about our product.
+                    I can only help with orders and delivery questions.
                     <div className={styles.hoverTooltip} role="tooltip">
-                      Since the user message was labeled off topic, the agent responds with a
-                      hardcoded response.
+                      Classified as off-topic, so the bot returns a fixed fallback instead of calling the LLM.
                     </div>
                   </div>
                 </div>
@@ -1693,7 +1718,7 @@ export default function HomePage() {
                   key={chip.label}
                   className={styles.composerExampleChip}
                   onClick={() => {
-                    setDescription(`${chip.label} — ${chip.body}`);
+                    setDescription(chip.body);
                     if (error) setError("");
                   }}
                   type="button"

@@ -675,7 +675,7 @@ export default function ProjectPage() {
     source.addEventListener("run_done", () => { void refreshRun(); source.close(); setSseActive(false); });
     source.onerror = () => { source.close(); setSseActive(false); };
     return () => { source.close(); setSseActive(false); };
-  }, [selectedRunId, runs]);
+  }, [selectedRunId, runs.find((r) => r.id === selectedRunId)?.status]);
 
   // ── Auto-scroll terminal ──
   const eventCount = runDetail?.events?.length ?? 0;
@@ -949,11 +949,16 @@ export default function ProjectPage() {
               </div>
 
               <div className="field">
+                <label className="sr-only" htmlFor="seed-input">
+                  Seed examples for the selected label
+                </label>
                 <textarea
+                  id="seed-input"
                   className="textarea"
                   rows={8}
                   value={seedInputs[addLabelTab]}
                   onChange={(e) => setSeedInputs((s) => ({ ...s, [addLabelTab]: e.target.value }))}
+                  name="seed_examples"
                   placeholder="One example per line…"
                   style={{ fontSize: "0.8rem", fontFamily: "var(--font-mono), monospace" }}
                 />
@@ -1112,11 +1117,16 @@ export default function ProjectPage() {
 
           <form className="stack-sm" onSubmit={classify} style={{ marginTop: 8 }}>
             <div className="field">
+              <label className="sr-only" htmlFor="playground-message">
+                Message to classify
+              </label>
               <textarea
+                id="playground-message"
                 className="textarea"
                 rows={4}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
+                name="playground_message"
                 placeholder="Type a support message about the allowed topics…"
                 style={{ fontSize: "0.85rem" }}
               />
