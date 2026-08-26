@@ -74,6 +74,11 @@ export type RunDetail = Run & {
   events: RunEvent[];
 };
 
+export type RunStatusResponse = Run & {
+  event_count: number;
+  latest_event?: RunEvent | null;
+};
+
 export type ProjectDetail = {
   project: Project;
   examples: Example[];
@@ -100,6 +105,23 @@ export type LuckyPromptResponse = {
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 const SESSION_STORAGE_KEY = "scope-classifier-session-id";
+
+export async function checkBackendHealth(timeoutMs = 5000): Promise<boolean> {
+  if (typeof window === "undefined") return true;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      signal: controller.signal,
+      cache: "no-store"
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function createFallbackSessionId(): string {
   const timestamp = Date.now().toString(36);
@@ -148,6 +170,7 @@ export const api = {
     request<Example[]>(`/projects/${projectId}/examples`, { method: "POST", body: JSON.stringify(payload) }),
   startRun: (projectId: string) => request<Run>(`/projects/${projectId}/runs`, { method: "POST", body: JSON.stringify({}) }),
   getRun: (runId: string) => request<RunDetail>(`/runs/${runId}`),
+  getRunStatus: (runId: string) => request<RunStatusResponse>(`/runs/${runId}/status`),
   getRunEvents: (runId: string) => request<RunEvent[]>(`/runs/${runId}/events`),
   classify: (projectId: string, text: string) =>
     request<ClassificationResponse>(`/projects/${projectId}/classify`, {

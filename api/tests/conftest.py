@@ -9,6 +9,9 @@ from app.database import init_db
 
 @pytest.fixture(autouse=True)
 def isolate_settings(request, tmp_path):
+    from app.main import quick_start_rate_limiter
+
+    quick_start_rate_limiter.clear()
     config_module.settings.data_dir = tmp_path / "data"
     config_module.settings.workspace_dir = tmp_path / "workspaces"
     config_module.settings.memory_dir = tmp_path / "memories"
@@ -21,6 +24,7 @@ def isolate_settings(request, tmp_path):
     else:
         init_db()
     yield
+    quick_start_rate_limiter.clear()
     shutil.rmtree(tmp_path, ignore_errors=True)
 
 

@@ -1,5 +1,13 @@
 .DS_Store
 .worktrees
+.agents
+.claude
+.codex
+.cursor
+.railway
+.vercel
+.playwright-cli
+.playwright-mcp
 .next
 .pytest_cache
 .venv
@@ -9,6 +17,8 @@ dist
 build
 artifacts
 data
+*.egg-info
+*.tsbuildinfo
 *.pyc
 *.sqlite3
 *.db

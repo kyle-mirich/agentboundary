@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -37,16 +37,16 @@ class RunStatus(str, Enum):
 
 
 class ProjectCreate(BaseModel):
-    name: str
-    support_domain_description: str
-    allowed_topics: list[str] = Field(default_factory=list)
-    disallowed_topics: list[str] = Field(default_factory=list)
-    routing_notes: str = ""
-    agent_model: str = Field(default_factory=lambda: settings.default_agent_model)
-    max_rounds: int = 3
-    target_macro_f1: float = 0.9
-    target_out_of_scope_precision: float = 0.95
-    sandbox_profile: str = "isolated_fs"
+    name: str = Field(min_length=1, max_length=120)
+    support_domain_description: str = Field(min_length=12, max_length=4000)
+    allowed_topics: list[str] = Field(default_factory=list, max_length=50)
+    disallowed_topics: list[str] = Field(default_factory=list, max_length=50)
+    routing_notes: str = Field(default="", max_length=4000)
+    agent_model: str = Field(default_factory=lambda: settings.default_agent_model, min_length=1, max_length=120)
+    max_rounds: int = Field(default=3, ge=1, le=10)
+    target_macro_f1: float = Field(default=0.9, ge=0.0, le=1.0)
+    target_out_of_scope_precision: float = Field(default=0.95, ge=0.0, le=1.0)
+    sandbox_profile: Literal["isolated_fs", "runloop"] = "isolated_fs"
 
 
 class ProjectRecord(ProjectCreate):
@@ -57,7 +57,7 @@ class ProjectRecord(ProjectCreate):
 
 
 class ExampleInput(BaseModel):
-    text: str
+    text: str = Field(min_length=1, max_length=4000)
     label: Label
     source: ExampleSource = ExampleSource.HUMAN_SEED
     approved: bool = True
@@ -71,7 +71,7 @@ class ExampleRecord(ExampleInput):
 
 
 class RunCreate(BaseModel):
-    max_rounds_override: int | None = None
+    max_rounds_override: int | None = Field(default=None, ge=1, le=10)
 
 
 class RunRecord(BaseModel):
@@ -120,6 +120,20 @@ class RunDetail(RunRecord):
     events: list["RunEventRecord"] = Field(default_factory=list)
 
 
+class RunStatusResponse(BaseModel):
+    id: str
+    project_id: str
+    status: RunStatus
+    summary: str | None = None
+    stop_reason: str | None = None
+    best_round_id: str | None = None
+    best_macro_f1: float | None = None
+    event_count: int
+    latest_event: "RunEventRecord | None" = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class ProjectDetail(BaseModel):
     project: ProjectRecord
     examples: list[ExampleRecord] = Field(default_factory=list)
@@ -129,7 +143,7 @@ class ProjectDetail(BaseModel):
 
 
 class ClassificationRequest(BaseModel):
-    text: str
+    text: str = Field(min_length=1, max_length=1000)
 
 
 class ClassificationResponse(BaseModel):
@@ -149,7 +163,7 @@ class RunEventRecord(BaseModel):
 
 
 class QuickStartRequest(BaseModel):
-    description: str
+    description: str = Field(min_length=12, max_length=1200)
 
 
 class QuickStartResponse(BaseModel):

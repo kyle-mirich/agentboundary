@@ -1,4 +1,4 @@
-.PHONY: install install-api install-web dev-api dev-web test backend-test frontend-build
+.PHONY: install install-api install-web dev-api dev-web test backend-test frontend-check frontend-build
 
 install: install-api install-web
 
@@ -14,10 +14,15 @@ dev-api:
 dev-web:
 	cd web && npm run dev
 
-test: backend-test frontend-build
+test: backend-test frontend-check
 
 backend-test:
-	cd api && uv run pytest
+	cd api && uv run python -m pytest
+
+frontend-check:
+	cd web && npm run typecheck
+	cd web && npm audit --omit=dev
+	cd web && npm run build
 
 frontend-build:
 	cd web && npm run build

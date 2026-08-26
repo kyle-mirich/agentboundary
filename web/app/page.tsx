@@ -161,6 +161,97 @@ function formatPayload(payload: Record<string, unknown> | null | undefined): str
   return JSON.stringify(payload, null, 2);
 }
 
+function readNumber(payload: Record<string, unknown>, key: string): number | null {
+  return typeof payload[key] === "number" ? (payload[key] as number) : null;
+}
+
+function formatTerminalEvent(event: RunEvent): string {
+  const payload = event.payload ?? {};
+  const roundIndex = readNumber(payload, "round_index");
+  const count = readNumber(payload, "count");
+  const generatedCount = readNumber(payload, "generated_count");
+  const acceptedExamples = readNumber(payload, "accepted_examples");
+  const trainCount = readNumber(payload, "train_count");
+  const evalCount = readNumber(payload, "eval_count");
+  const macroF1 = extractEvaluationMetric(payload, "macro_f1");
+  const holdoutF1 = readNumber(payload, "holdout_macro_f1") ?? macroF1;
+  const candidateFile = typeof payload.candidate_file === "string" ? payload.candidate_file : null;
+  const checkpointPath = typeof payload.checkpoint_path === "string" ? payload.checkpoint_path : null;
+  const summaryFile = typeof payload.summary_file === "string" ? payload.summary_file : null;
+  const focusNote = typeof payload.focus_note === "string" ? payload.focus_note : "";
+
+  switch (event.event_type) {
+    case "run_queued":
+      return "queue: persisted the run record, allocated a workspace, and attached the browser session.";
+    case "seed_generation_started":
+      return "seed-generator: reading the scope brief and asking the generation model for balanced labeled examples.";
+    case "seed_generation_completed": {
+      const counts = payload.counts as Record<string, number> | undefined;
+      const countSummary = counts
+        ? `${counts.in_scope ?? 0} in scope, ${counts.out_of_scope ?? 0} out of scope, ${counts.ambiguous ?? 0} ambiguous`
+        : "label counts recorded";
+      return `seed-generator: parsed ${countSummary}; storing examples before the agent starts training.`;
+    }
+    case "seed_generation_label_count":
+      return `dataset: confirmed ${count ?? 0} ${String(payload.label ?? "labeled").replaceAll("_", "-")} seed examples.`;
+    case "run_started":
+      return "orchestrator: opened the Deep Agents workspace and loaded project scope, tools, and memory routes.";
+    case "plan_ready":
+      return `orchestrator: wrote /workspace/plan.md and locked a ${readNumber(payload, "round_budget") ?? 3}-round experiment plan.`;
+    case "round_started":
+      return `agent: starting round ${roundIndex ?? "?"}${focusNote ? ` with focus "${truncate(focusNote, 96)}"` : " as the baseline checkpoint"}.`;
+    case "candidate_generation_started":
+      return `dataset-agent: checking whether round ${roundIndex ?? "?"} needs hard-case augmentation.`;
+    case "candidate_generation_skipped":
+      return `dataset-agent: no failure mode yet; wrote an empty candidate file and kept the initial seed set fixed.`;
+    case "generation_in_progress":
+      return `dataset-agent: generating ${count ?? "new"} ${String(payload.label ?? "labeled").replaceAll("_", "-")} ${String(payload.phase ?? "candidate")} examples.`;
+    case "candidates_generated":
+      return `dataset-agent: wrote ${generatedCount ?? 0} filtered candidates to ${candidateFile ?? "the round candidate file"}.`;
+    case "dataset_prep_started":
+      return `trainer: loading ${candidateFile ?? "candidate JSONL"}, deduping texts, and rebuilding train/eval splits.`;
+    case "dataset_prepared":
+      return `trainer: accepted ${acceptedExamples ?? 0} new examples; train=${trainCount ?? "?"}, eval=${evalCount ?? "?"}.`;
+    case "training_started":
+      return `trainer: fitting ${String(payload.model_name ?? "the boundary model")} for round ${roundIndex ?? "?"}.`;
+    case "training_complete":
+      return `trainer: saved checkpoint ${checkpointPath ?? ""} with loss ${String(payload.training_loss ?? "recorded")}.`;
+    case "evaluation_started":
+      return `evaluator: scoring round ${roundIndex ?? "?"} against the locked eval split.`;
+    case "evaluation_complete":
+      return `evaluator: round ${roundIndex ?? "?"} macro F1=${formatMetric(macroF1)}; per-label metrics saved.`;
+    case "round_complete":
+      return `orchestrator: round ${roundIndex ?? "?"} finished; handing metrics to the reviewer.`;
+    case "holdout_generation_started":
+      return `holdout-agent: preparing a blind holdout set with ${String(payload.count_per_label ?? 8)} examples per label.`;
+    case "holdout_created":
+      return `holdout-agent: persisted ${count ?? generatedCount ?? 0} new holdout examples for repeatable final scoring.`;
+    case "holdout_reused":
+      return `holdout-agent: reusing the persisted ${count ?? 0}-example holdout set for apples-to-apples comparison.`;
+    case "holdout_evaluation_started":
+      return `evaluator: loading the promoted candidate checkpoint and scoring the persisted holdout set.`;
+    case "holdout_evaluated":
+      return `evaluator: holdout macro F1=${formatMetric(holdoutF1)} across ${String(payload.holdout_count ?? "the")} holdout examples.`;
+    case "review_started":
+      return `reviewer: reading round ${roundIndex ?? "?"} metrics and writing a concise failure-mode assessment.`;
+    case "review_recorded":
+      return `reviewer: saved round ${roundIndex ?? "?"} review note: ${truncate(String(payload.note || "no note"), 110)}`;
+    case "run_reviewed":
+      return `orchestrator: compared all rounds and selected round ${String(payload.best_round_index ?? "?")} as the strongest checkpoint.`;
+    case "final_summary_recorded":
+      return `orchestrator: wrote ${summaryFile ?? "/workspace/reports/final-summary.md"} with the round-by-round decision trail.`;
+    case "checkpoint_promoted":
+      return `release: promoted round ${roundIndex ?? "?"}; classifier endpoint can now serve live traffic.`;
+    case "run_completed":
+      return `release: run complete; best macro F1=${formatMetric(readNumber(payload, "best_macro_f1"))}, holdout F1=${formatMetric(readNumber(payload, "holdout_macro_f1"))}.`;
+    case "run_failed":
+    case "seed_generation_failed":
+      return `error: ${event.message}`;
+    default:
+      return `${formatEventTypeLabel(event.event_type)}: ${event.message}`;
+  }
+}
+
 function extractEvaluationMetric(payload: Record<string, unknown>, key: string): number | null {
   const direct = payload[key];
   if (typeof direct === "number") return direct;
@@ -216,6 +307,7 @@ function ProcessingShell(props: {
   elapsedSeconds: number;
   onOpenDetails: () => void;
   agentModel: string;
+  containerRef: RefObject<HTMLElement | null>;
 }) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalShouldFollowRef = useRef(true);
@@ -245,7 +337,7 @@ function ProcessingShell(props: {
   }
 
   return (
-    <section className={styles.takeoverBody} aria-label="Processing experience">
+    <section ref={props.containerRef} className={styles.takeoverBody} aria-label="Processing experience" tabIndex={-1}>
       <div className={`${styles.composerShell} ${styles.processingShell}`}>
         <section className={`${styles.composerCard} ${styles.processingCard}`} style={{ animation: "demoScaleIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both" }}>
           <header className={styles.composerHeader}>
@@ -301,7 +393,7 @@ function ProcessingShell(props: {
                       >
                         {event.event_type === "checkpoint_promoted" ? "★" : event.event_type.includes("failed") ? "!" : "•"}
                       </span>
-                      <span className={styles.processingTerminalEvent}>{event.message}</span>
+                      <span className={styles.processingTerminalEvent}>{formatTerminalEvent(event)}</span>
                     </div>
                   ))
                 )}
@@ -414,7 +506,7 @@ function ResultShell(props: {
               <button
                 className={styles.primaryButton}
                 onClick={props.onClassify}
-                disabled={props.classifying || !props.testInput.trim()}
+                disabled={props.classifying}
                 type="button"
                 style={{ minHeight: "58px" }}
               >
@@ -551,6 +643,13 @@ function ErrorShell(props: {
 function LuckyPromptModal(props: { prompt: string; loading: boolean; closing: boolean }) {
   const [displayed, setDisplayed] = useState("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.focus();
+    return () => previousFocus?.focus();
+  }, []);
 
   useEffect(() => {
     if (!props.prompt) {
@@ -578,10 +677,13 @@ function LuckyPromptModal(props: { prompt: string; loading: boolean; closing: bo
     <>
       <div className={styles.drawerBackdrop} aria-hidden="true" />
       <div
+        ref={dialogRef}
         className={`${styles.luckyModal} ${props.closing ? styles.luckyModalClosing : ""}`}
         aria-label="Feeling Lucky"
+        aria-busy={props.loading}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
       >
         <p className={styles.luckyModalEyebrow}>Feeling Lucky</p>
         <h2 className={styles.luckyModalTitle}>
@@ -622,6 +724,50 @@ function TraceDrawer(props: {
   liveEvents: RunEvent[];
   runDetail: RunDetail | null;
 }) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(props.onClose);
+
+  useEffect(() => {
+    onCloseRef.current = props.onClose;
+  }, [props.onClose]);
+
+  useEffect(() => {
+    if (!props.open) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButtonRef.current?.focus();
+
+    function handleDialogKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], summary, input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleDialogKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleDialogKeyDown);
+      previousFocus?.focus();
+    };
+  }, [props.open]);
+
   if (!props.open) return null;
 
   const traceEvents = props.runDetail?.events?.length
@@ -639,7 +785,7 @@ function TraceDrawer(props: {
         onClick={props.onClose}
         type="button"
       />
-      <aside className={styles.drawer} aria-label="Training trace" aria-modal="true" role="dialog">
+      <aside ref={dialogRef} className={styles.drawer} aria-label="Training trace" aria-modal="true" role="dialog">
         <div className={styles.drawerShell}>
           <header className={styles.drawerHeader}>
             <div className={styles.drawerHeaderCopy}>
@@ -650,7 +796,7 @@ function TraceDrawer(props: {
                 results without leaving the modal.
               </p>
             </div>
-            <button className={styles.drawerClose} onClick={props.onClose} type="button">
+            <button ref={closeButtonRef} className={styles.drawerClose} onClick={props.onClose} type="button">
               Close
             </button>
           </header>
@@ -834,6 +980,7 @@ function TraceDrawer(props: {
 export default function HomePage() {
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const testInputRef = useRef<HTMLInputElement>(null);
+  const processingRef = useRef<HTMLElement>(null);
   const setupTimersRef = useRef<number[]>([]);
   const idleTransitionTimerRef = useRef<number | null>(null);
   const activityIndexRef = useRef(0);
@@ -1130,7 +1277,13 @@ export default function HomePage() {
 
   async function handleClassify(inputText?: string) {
     const text = (inputText ?? testInput).trim();
-    if (!text || classifying) return;
+    if (!text || classifying) {
+      if (!text) {
+        setTestError("Enter a message to classify.");
+        testInputRef.current?.focus();
+      }
+      return;
+    }
 
     setClassifying(true);
     setTestError("");
@@ -1181,8 +1334,9 @@ export default function HomePage() {
         });
         if (event.message) {
           setLogLines((previous) => {
-            if (previous.includes(event.message)) return previous;
-            return [...previous, event.message].slice(-240);
+            const terminalLine = formatTerminalEvent(event);
+            if (previous.includes(terminalLine)) return previous;
+            return [...previous, terminalLine].slice(-240);
           });
         }
       });
@@ -1373,6 +1527,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (view === "processing") {
+      processingRef.current?.focus();
       const interval = window.setInterval(() => {
         if (!startedAtRef.current) return;
         setDurationSeconds(Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000)));
@@ -1444,7 +1599,7 @@ export default function HomePage() {
       const history = await api.getRunEvents(runId).catch(() => []);
       startTransition(() => {
         setLiveEvents(history.slice(-120));
-        setLogLines(history.map((event) => event.message).slice(-240));
+        setLogLines(history.map((event) => formatTerminalEvent(event)).slice(-240));
       });
       history.forEach((event) => recordRunEvent(event, false));
 
@@ -1564,7 +1719,7 @@ export default function HomePage() {
                   <div className={styles.stepNumber}>2</div>
                   <div className={styles.stepLabel}>Generate</div>
                   <div className={styles.hoverTooltip} role="tooltip">
-                    Synthesize ~240 balanced examples with a holdout split.
+                    Synthesize ~90 balanced examples with a holdout split.
                   </div>
                 </div>
                 <div className={styles.stepConnector}></div>
@@ -1732,7 +1887,7 @@ export default function HomePage() {
             <div className={styles.launchActions}>
               <button
                 className={styles.primaryButton}
-                disabled={submitting || luckyLoading || !description.trim()}
+                disabled={submitting || luckyLoading}
                 onClick={() => void handleSubmit()}
                 type="button"
               >
@@ -1780,6 +1935,7 @@ export default function HomePage() {
             <ProcessingShell
               activityFeed={activityFeed}
               agentModel={agentModel}
+              containerRef={processingRef}
               currentStage={currentStage}
               description={description}
               elapsedSeconds={durationSeconds}

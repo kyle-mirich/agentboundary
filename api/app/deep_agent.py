@@ -48,7 +48,11 @@ class LocalWorkspaceIO(WorkspaceIO):
 
     def resolve(self, relative_path: str) -> Path:
         relative = relative_path.removeprefix("/workspace/").lstrip("/")
-        return self.root / relative
+        root = self.root.resolve()
+        target = (root / relative).resolve()
+        if not target.is_relative_to(root):
+            raise ValueError("Workspace paths must remain inside the run workspace")
+        return target
 
     def read_text(self, relative_path: str) -> str:
         return self.resolve(relative_path).read_text()
@@ -150,7 +154,7 @@ def _build_backend(project_id: str, run_id: str, sandbox_profile: str):
     memories_root = settings.memory_dir / project_id
     memories_root.mkdir(parents=True, exist_ok=True)
     backend = lambda runtime: CompositeBackend(
-        default=StateBackend(runtime),
+        default=StateBackend(),
         routes={
             "/workspace/": FilesystemBackend(root_dir=str(workspace_root), virtual_mode=True),
             "/memories/": FilesystemBackend(root_dir=str(memories_root), virtual_mode=True),
@@ -878,7 +882,11 @@ class DeepAgentRunner:
             )
             tools = _make_tools(context)
             agent = create_deep_agent(
-                model=ChatOpenAI(model=project.agent_model, api_key=resolved_openai_api_key),
+                model=ChatOpenAI(
+                    model=project.agent_model,
+                    api_key=resolved_openai_api_key,
+                    use_responses_api=True,
+                ),
                 tools=tools,
                 subagents=_build_subagents(),
                 backend=backend_factory,

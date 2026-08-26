@@ -7,7 +7,7 @@ def test_seed_validation_and_split_assignment():
     project = repository.create_project(
         ProjectCreate(
             name="Support",
-            support_domain_description="Domain",
+            support_domain_description="Support domain",
             allowed_topics=["billing"],
             disallowed_topics=["coding"],
             routing_notes="",
@@ -34,7 +34,7 @@ def test_holdout_examples_are_persisted_separately():
     project = repository.create_project(
         ProjectCreate(
             name="Support Holdout",
-            support_domain_description="Domain",
+            support_domain_description="Support domain",
             allowed_topics=["billing"],
             disallowed_topics=["coding"],
             routing_notes="",

@@ -17,6 +17,46 @@ def test_healthcheck_endpoint():
     assert response.json() == {"status": "ok"}
 
 
+def test_health_details_reports_safe_operational_status():
+    client = TestClient(app)
+
+    with patch(
+        "app.main._provider_health",
+        return_value={"status": "ok", "configured": True, "models_checked": ["gpt-test"]},
+    ):
+        response = client.get("/health/details")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["database"]["status"] == "ok"
+    assert body["database"]["backend"] == "sqlite"
+    assert body["provider"]["status"] == "ok"
+    assert "app.db" in body["database"]["target"]
+    assert body["model"]["classifier"] == "distilbert-base-uncased"
+    assert "openai_api_key" not in body
+    assert "database_url" not in body
+
+
+def test_health_details_is_degraded_when_provider_is_unavailable():
+    client = TestClient(app)
+
+    with patch(
+        "app.main._provider_health",
+        return_value={
+            "status": "error",
+            "configured": True,
+            "models_checked": ["gpt-test"],
+            "error_type": "AuthenticationError",
+        },
+    ):
+        response = client.get("/health/details")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "degraded"
+    assert response.json()["provider"]["error_type"] == "AuthenticationError"
+
+
 def test_project_run_stream_and_classify_endpoints(tmp_path):
     client = TestClient(app)
 
@@ -69,7 +109,7 @@ def test_project_run_stream_and_classify_endpoints(tmp_path):
 
     get_events_response = client.get(f"/runs/{run_id}/events", headers=SESSION_HEADERS)
     assert get_events_response.status_code == 200
-    assert get_events_response.json() == []
+    assert [event["event_type"] for event in get_events_response.json()] == ["run_queued"]
 
     repository.create_run_event(
         run_id,
@@ -78,6 +118,13 @@ def test_project_run_stream_and_classify_endpoints(tmp_path):
         payload={"round_index": 1},
     )
     repository.update_run(run_id, status=RunStatus.COMPLETED)
+
+    status_response = client.get(f"/runs/{run_id}/status", headers=SESSION_HEADERS)
+    assert status_response.status_code == 200
+    assert status_response.json()["id"] == run_id
+    assert status_response.json()["status"] == "completed"
+    assert status_response.json()["event_count"] == 2
+    assert status_response.json()["latest_event"]["message"] == "Round 1 started"
 
     with client.stream("GET", f"/runs/{run_id}/events/stream", headers=SESSION_HEADERS) as response:
         stream_body = "".join(response.iter_text())

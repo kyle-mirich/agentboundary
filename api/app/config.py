@@ -10,15 +10,16 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     workspace_dir: Path = Path("data/workspaces")
     memory_dir: Path = Path("data/memories")
-    artifacts_dir: Path = Path("artifacts")
+    artifacts_dir: Path = Path("data/artifacts")
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    app_version: str = Field(default="local", validation_alias=AliasChoices("APP_VERSION", "RAILWAY_GIT_COMMIT_SHA"))
     model_name: str = "distilbert-base-uncased"
     default_agent_model: str = Field(
-        default="gpt-5.4-mini",
+        default="gpt-5.6-luna",
         validation_alias=AliasChoices("APP_AGENT_MODEL", "AGENT_MODEL", "APP_DEFAULT_AGENT_MODEL", "DEFAULT_AGENT_MODEL"),
     )
     responses_generation_model: str = Field(
-        default="gpt-5.4-mini",
+        default="gpt-5.6-luna",
         validation_alias=AliasChoices(
             "APP_RESPONSES_GENERATION_MODEL",
             "RESPONSES_GENERATION_MODEL",
@@ -26,12 +27,14 @@ class Settings(BaseSettings):
             "GENERATION_MODEL",
         ),
     )
-    max_sequence_length: int = 256
+    max_sequence_length: int = 128
     batch_size: int = 4
     epochs: int = 3
     learning_rate: float = 2e-5
     generated_examples_per_label: int = 24
     eval_holdout_ratio: float = 0.2
+    quick_start_rate_limit: int = 3
+    quick_start_rate_window_seconds: int = 3600
     database_url: str = Field(
         default="",
         validation_alias=AliasChoices("APP_DATABASE_URL", "DATABASE_URL"),

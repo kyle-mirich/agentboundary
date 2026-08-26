@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import random
 
-from openai import APIConnectionError, APITimeoutError, OpenAI
+from openai import OpenAI
 
 from .config import settings
 from .models import ExampleInput, ExampleSource, Label
@@ -33,7 +33,7 @@ Return this schema only:
 [{{"text": "...", "label": "in_scope"}}, ...]\
 """
 
-_REQUEST_TIMEOUT_SECONDS = 20.0
+_REQUEST_TIMEOUT_SECONDS = 120.0
 _SEEDS_PER_LABEL = 30
 _LUCKY_PROMPTS = [
     "The chatbot should handle questions about Star Wars lore, characters, timelines, and canon debates.",
@@ -102,18 +102,13 @@ def generate_seeds(description: str) -> list[ExampleInput]:
             raise ValueError(f"Missing labels: {required - labels_present}")
         return examples
 
-    try:
-        return _attempt()
-    except (APITimeoutError, APIConnectionError):
-        pass
-    except Exception:
+    last_exc: Exception | None = None
+    for _ in range(2):
         try:
             return _attempt()
-        except (APITimeoutError, APIConnectionError):
-            pass
         except Exception as exc:
-            raise RuntimeError("Seed generation failed") from exc
-    raise RuntimeError("Seed generation failed")
+            last_exc = exc
+    raise RuntimeError(f"Seed generation failed: {last_exc}") from last_exc
 
 
 def generate_lucky_description() -> str:

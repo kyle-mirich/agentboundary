@@ -1,0 +1,80 @@
+name: Railway office hours
+
+on:
+  schedule:
+    - cron: "0 * * * *" # every hour; acts only at 6:00 and 20:00 Pacific
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Force start or stop"
+        required: true
+        default: "start"
+        type: choice
+        options:
+          - start
+          - stop
+
+env:
+  RAILWAY_API: https://backboard.railway.app/graphql/v2
+  PROJECT_ID: "0e31e768-1df8-4c91-8fe9-700f71c29852"
+  ENVIRONMENT_ID: "88d9ccf8-660c-430a-a66d-60d92955f8cd"
+  SERVICE_ID: "0c488137-5d8f-47a2-9e49-166cd425a5db"
+
+jobs:
+  toggle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide action
+        id: window
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "action=${{ inputs.action }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          HOUR=$(TZ=America/Los_Angeles date +%H)
+          if [ "$HOUR" -eq 06 ]; then
+            echo "action=start" >> "$GITHUB_OUTPUT"
+          elif [ "$HOUR" -eq 20 ]; then
+            echo "action=stop" >> "$GITHUB_OUTPUT"
+          else
+            echo "action=none" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Toggle deployment
+        if: steps.window.outputs.action != 'none'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          ACTION: ${{ steps.window.outputs.action }}
+        run: |
+          set -euo pipefail
+
+          DEPLOYMENT_ID=$(curl -s -X POST "$RAILWAY_API" \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"query { deployments(input: { projectId: \\\"$PROJECT_ID\\\", environmentId: \\\"$ENVIRONMENT_ID\\\", serviceId: \\\"$SERVICE_ID\\\" }, first: 10) { edges { node { id status } } } }\"}" \
+            | jq -r '.data.deployments.edges[] | select(.node.status == "SUCCESS" or .node.status == "SLEEPING" or .node.status == "CRASHED") | .node.id' \
+            | head -1)
+
+          if [ -z "$DEPLOYMENT_ID" ]; then
+            echo "No eligible deployment found; nothing to do."
+            exit 0
+          fi
+
+          echo "Latest deployment: $DEPLOYMENT_ID ($ACTION)"
+
+          if [ "$ACTION" = "start" ]; then
+            MUTATION="mutation { deploymentRedeploy(id: \\\"$DEPLOYMENT_ID\\\") }"
+          else
+            MUTATION="mutation { deploymentStop(id: \\\"$DEPLOYMENT_ID\\\") }"
+          fi
+
+          RESULT=$(curl -s -X POST "$RAILWAY_API" \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"$MUTATION\"}")
+
+          echo "$RESULT"
+          if echo "$RESULT" | jq -e '.errors' > /dev/null 2>&1; then
+            echo "Railway API returned errors"
+            exit 1
+          fi

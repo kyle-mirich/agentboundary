@@ -2,7 +2,7 @@
 name = "agent-boundary-api"
 version = "0.1.0"
 description = "FastAPI backend for a Deep Agents in-scope text classifier"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = [
   "deepagents>=0.4.12,<1.0.0",
   "fastapi>=0.115.0",
@@ -23,6 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "httpx>=0.28.0",
+  "httpx2>=2.9.1",
   "pytest>=8.3.0",
 ]
 runloop = [

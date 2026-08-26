@@ -49,7 +49,7 @@ Key fields:
 
 ### `runs`
 
-Tracks each experiment run for a project.
+Tracks each experiment run for a project. A run is the durable job record for the quick-start and manual training flows.
 
 Key fields:
 
@@ -82,7 +82,7 @@ Key fields:
 
 ### `run_events`
 
-Stores the event stream rendered live in the UI.
+Stores the event stream rendered live in the UI. The frontend can replay these events before opening the SSE stream, so refreshes and reconnects still show what happened.
 
 Key fields:
 
@@ -113,5 +113,6 @@ For production PostgreSQL:
 - use a persistent managed Postgres instance
 - include the deployed frontend origin in `APP_CORS_ORIGINS`
 - back up the database if you intend to preserve projects or artifacts
+- use `GET /health/details` to verify the API can connect without exposing raw credentials
 
 For Supabase pooler connections on port `6543`, the username must include the project ref, for example `postgres.<project-ref>`.

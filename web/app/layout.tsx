@@ -1,6 +1,7 @@
 import "./globals.css";
 import "./demo-v2.css";
 import type { Metadata, Viewport } from "next";
+import WakeupGate from "./wakeup";
 
 export const metadata: Metadata = {
   title: "Agent Boundary",
@@ -48,7 +49,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       }
     >
       <body>
-        {children}
+        <WakeupGate>{children}</WakeupGate>
       </body>
     </html>
   );

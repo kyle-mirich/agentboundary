@@ -3,7 +3,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app import config as config_module
+from app.main import app, quick_start_rate_limiter
 from app.models import ExampleInput, ExampleSource, Label
 
 SESSION_HEADERS = {"X-Session-Id": "test-session"}
@@ -32,6 +33,54 @@ def test_quick_start_returns_project_and_run_ids():
     assert "run_id" in body
     assert isinstance(body["project_id"], str)
     assert isinstance(body["run_id"], str)
+
+
+def test_quick_start_rejects_overlong_description():
+    client = TestClient(app)
+
+    response = client.post(
+        "/quick-start",
+        headers=SESSION_HEADERS,
+        json={"description": "x" * 1201},
+    )
+
+    assert response.status_code == 422
+    assert "at most 1200 characters" in response.text
+
+
+def test_quick_start_rate_limit_is_per_session():
+    client = TestClient(app)
+    original_limit = config_module.settings.quick_start_rate_limit
+    config_module.settings.quick_start_rate_limit = 1
+    quick_start_rate_limiter.clear()
+    try:
+        with (
+            patch("app.main.generate_seeds", return_value=MOCK_SEEDS),
+            patch("app.main.runner.execute_run"),
+        ):
+            first_response = client.post(
+                "/quick-start",
+                headers=SESSION_HEADERS,
+                json={"description": "classify customer support tickets"},
+            )
+            second_response = client.post(
+                "/quick-start",
+                headers=SESSION_HEADERS,
+                json={"description": "classify customer support tickets again"},
+            )
+            other_session_response = client.post(
+                "/quick-start",
+                headers={"X-Session-Id": "other-session"},
+                json={"description": "classify customer support tickets"},
+            )
+    finally:
+        config_module.settings.quick_start_rate_limit = original_limit
+        quick_start_rate_limiter.clear()
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert "Quick-start limit reached" in second_response.json()["detail"]
+    assert other_session_response.status_code == 200
 
 
 def test_quick_start_creates_project_with_description():
@@ -88,6 +137,7 @@ def test_quick_start_logs_real_seed_generation_events():
     events = client.get(f"/runs/{run_id}/events", headers=SESSION_HEADERS).json()
     event_types = [event["event_type"] for event in events]
 
+    assert "run_queued" in event_types
     assert "seed_generation_started" in event_types
     assert "seed_generation_completed" in event_types
     assert "seed_generation_label_count" in event_types
@@ -131,6 +181,17 @@ def test_quick_start_requires_session_id():
     client = TestClient(app)
     response = client.post("/quick-start", json={"description": "test"})
     assert response.status_code == 400
+
+
+def test_quick_start_rejects_invalid_session_id():
+    client = TestClient(app)
+    response = client.post(
+        "/quick-start",
+        headers={"X-Session-Id": "../invalid session"},
+        json={"description": "classify customer support tickets"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid session id"
 
 
 @pytest.mark.no_db

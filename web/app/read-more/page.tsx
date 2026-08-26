@@ -126,6 +126,62 @@ export default function ReadMorePage() {
           </section>
 
           <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Production architecture</h2>
+            <div className={styles.featureGrid}>
+              <div className={styles.feature}>
+                <h3>Vercel frontend</h3>
+                <p>
+                  The public demo runs as a Next.js app with browser-scoped sessions, server-sent
+                  event streaming, and a trace drawer for reviewing the run after completion.
+                </p>
+              </div>
+              <div className={styles.feature}>
+                <h3>Railway API</h3>
+                <p>
+                  FastAPI owns project state, seed generation, Deep Agents orchestration, training,
+                  promotion, health checks, and live classification.
+                </p>
+              </div>
+              <div className={styles.feature}>
+                <h3>Supabase Postgres</h3>
+                <p>
+                  Projects, examples, runs, rounds, and event logs are durable, which lets the UI
+                  replay progress and recover from stream reconnects.
+                </p>
+              </div>
+              <div className={styles.feature}>
+                <h3>OpenAI + classifier loop</h3>
+                <p>
+                  The agent plans the experiment, while deterministic backend tools generate data,
+                  train the model, evaluate checkpoints, and promote the best round.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Operational details</h2>
+            <ul className={styles.useCases}>
+              <li>
+                `GET /health` is used for platform uptime checks; `GET /health/details` reports safe
+                database and model diagnostics without exposing secrets.
+              </li>
+              <li>
+                Public quick-start runs are capped per browser session so the OpenAI-backed workflow
+                is harder to abuse.
+              </li>
+              <li>
+                Every run writes persisted events, so the terminal view is a replayable trace rather
+                than a temporary loading animation.
+              </li>
+              <li>
+                Local development defaults to SQLite, while production uses PostgreSQL through the
+                same repository layer.
+              </li>
+            </ul>
+          </section>
+
+          <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Where it fits in the real world</h2>
             <ul className={styles.useCases}>
               <li>
@@ -151,6 +207,16 @@ export default function ReadMorePage() {
               system design: turning a classifier into infrastructure that controls user experience,
               reduces bad answers, and makes an agent safer to ship. That is the kind of work teams want
               when they are building conversational products that need both quality and restraint.
+            </p>
+          </section>
+
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Next engineering step</h2>
+            <p className={styles.sectionBody}>
+              The current system persists runs and statuses, but the next production upgrade would be
+              moving execution into a dedicated worker with queue-backed retries and object storage for
+              checkpoints. That would separate request handling from long-running model work while
+              keeping the same product flow.
             </p>
           </section>
         </article>

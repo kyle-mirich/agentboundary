@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
+import threading
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterable
 
@@ -18,6 +21,15 @@ from .models import ClassificationResponse, ExampleRecord, Label
 LABELS = [Label.IN_SCOPE.value, Label.OUT_OF_SCOPE.value, Label.AMBIGUOUS.value]
 LABEL_TO_ID = {label: index for index, label in enumerate(LABELS)}
 ID_TO_LABEL = {index: label for label, index in LABEL_TO_ID.items()}
+
+_torch_threads = max(1, min(2, os.cpu_count() or 1))
+torch.set_num_threads(_torch_threads)
+try:
+    torch.set_num_interop_threads(1)
+except RuntimeError:
+    pass
+
+_model_cache_lock = threading.Lock()
 
 
 def get_device() -> torch.device:
@@ -80,11 +92,20 @@ class TrainingResult:
     train_count: int
 
 
-def _load_model(model_path: str):
+@lru_cache(maxsize=2)
+def _load_model_cached(model_path: str):
     resolved_path = str(Path(model_path).resolve())
     tokenizer = AutoTokenizer.from_pretrained(resolved_path, local_files_only=True)
     model = AutoModelForSequenceClassification.from_pretrained(resolved_path, local_files_only=True)
+    device = get_device()
+    model.to(device)
+    model.eval()
     return tokenizer, model
+
+
+def _load_model(model_path: str):
+    with _model_cache_lock:
+        return _load_model_cached(str(Path(model_path).resolve()))
 
 
 def train_model(train_examples: Iterable[ExampleRecord], checkpoint_dir: Path) -> TrainingResult:
@@ -136,8 +157,6 @@ def evaluate_model(eval_examples: Iterable[ExampleRecord], checkpoint_dir: Path)
     examples = list(eval_examples)
     tokenizer, model = _load_model(str(checkpoint_dir))
     device = get_device()
-    model.to(device)
-    model.eval()
     dataset = EncodedTextDataset(
         [item.text for item in examples],
         [LABEL_TO_ID[item.label.value] for item in examples],
@@ -148,7 +167,7 @@ def evaluate_model(eval_examples: Iterable[ExampleRecord], checkpoint_dir: Path)
     probabilities: list[float] = []
     targets: list[int] = []
 
-    with torch.no_grad():
+    with torch.inference_mode():
         for batch in dataloader:
             labels = batch.pop("labels")
             targets.extend(labels.tolist())
@@ -198,8 +217,6 @@ def evaluate_model(eval_examples: Iterable[ExampleRecord], checkpoint_dir: Path)
 def classify_text(text: str, checkpoint_dir: Path) -> ClassificationResponse:
     tokenizer, model = _load_model(str(checkpoint_dir))
     device = get_device()
-    model.to(device)
-    model.eval()
     encoded = tokenizer(
         [text],
         truncation=True,
@@ -208,7 +225,7 @@ def classify_text(text: str, checkpoint_dir: Path) -> ClassificationResponse:
         return_tensors="pt",
     )
     encoded = {key: value.to(device) for key, value in encoded.items()}
-    with torch.no_grad():
+    with torch.inference_mode():
         logits = model(**encoded).logits
         probs = torch.softmax(logits, dim=-1)[0].cpu().tolist()
     best_index = max(range(len(probs)), key=lambda index: probs[index])

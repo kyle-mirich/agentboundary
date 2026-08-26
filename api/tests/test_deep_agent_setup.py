@@ -43,6 +43,17 @@ def test_project_create_uses_configured_default_agent_model():
     assert project.agent_model == "gpt-test-agent"
 
 
+@pytest.mark.no_db
+def test_local_workspace_rejects_path_traversal(tmp_path):
+    workspace = LocalWorkspaceIO(tmp_path / "workspace")
+    workspace.ensure()
+
+    with pytest.raises(ValueError, match="inside the run workspace"):
+        workspace.write_text("/workspace/../../outside.txt", "unsafe")
+
+    assert not (tmp_path / "outside.txt").exists()
+
+
 def test_runner_uses_run_id_thread_id_and_persistent_memory_route():
     repository = Repository()
     project = repository.create_project(

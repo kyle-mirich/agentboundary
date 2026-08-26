@@ -1,5 +1,7 @@
 # Agent Boundary
 
+Live demo: [agentboundry.vercel.app](https://agentboundry.vercel.app)
+
 Agent Boundary is an open-source full-stack project for building an in-scope text classifier end to end. A Next.js frontend walks a user through defining what counts as in scope, generating labeled seeds, launching a Deep Agents-driven experiment run, reviewing training rounds, and testing the promoted classifier live.
 
 The project is intentionally opinionated:
@@ -13,7 +15,20 @@ The project is intentionally opinionated:
 - Deep Agents is used for bounded experiment planning and review, not as a vague chat wrapper.
 - The backend couples deterministic PyTorch training with agent-driven dataset iteration.
 - The UI is designed as a polished product experience instead of an internal admin surface.
-- The repo now includes CI, reproducible local commands, and supporting architecture and deployment docs.
+- The production shape is explicit: Vercel frontend, Railway FastAPI service, Supabase Postgres, OpenAI-powered seed generation, and persisted run events.
+- The repo includes CI, reproducible local commands, production diagnostics, rate limits, and supporting architecture and deployment docs.
+
+## Architecture At A Glance
+
+```text
+Vercel / Next.js
+  -> FastAPI on Railway
+     -> Supabase Postgres for projects, runs, rounds, examples, events
+     -> OpenAI + Deep Agents for experiment planning and review
+     -> PyTorch / Transformers classifier checkpoints
+```
+
+The browser owns a local session id and sends it as `X-Session-Id`, so reviewers can try the public demo without account setup while still keeping projects scoped per browser.
 
 ## Tech Stack
 
@@ -48,7 +63,7 @@ The project is intentionally opinionated:
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.11–3.13
 - `uv`
 - Node.js 22+
 - npm
@@ -102,6 +117,14 @@ That executes:
 - `cd api && uv run pytest`
 - `cd web && npm run build`
 
+Useful focused checks:
+
+```bash
+cd api && uv run pytest tests/test_quick_start.py tests/test_endpoint_coverage.py
+cd web && npm run typecheck
+cd web && npm audit --omit=dev
+```
+
 ## Environment Variables
 
 ### Required
@@ -115,7 +138,19 @@ That executes:
 - `APP_CORS_ORIGINS`: comma-separated allowed origins
 - `APP_AGENT_MODEL`: default orchestration model, defaults to `gpt-5.4-mini`
 - `APP_RESPONSES_GENERATION_MODEL`: model for structured example generation, defaults to `gpt-5.4-mini`
+- `APP_MODEL_NAME`: classifier model identifier, defaults to `distilbert-base-uncased`
+- `APP_QUICK_START_RATE_LIMIT`: quick-start runs allowed per browser session per window, defaults to `3`
+- `APP_QUICK_START_RATE_WINDOW_SECONDS`: rate-limit window, defaults to `3600`
+- `APP_VERSION`: release identifier returned by `/health/details`, defaults to `local`
+- `APP_ARTIFACTS_DIR`: checkpoint directory, defaults to `data/artifacts` so one mounted data volume persists all runtime files
 - `RUNLOOP_API_KEY`: required only when using the optional `runloop` sandbox profile
+
+## Production Diagnostics
+
+The API exposes two health surfaces:
+
+- `GET /health`: minimal uptime check, returns `{"status":"ok"}`.
+- `GET /health/details`: safe operational readiness with database connectivity, provider credential/model validation, sanitized targets, app version, and uptime. It does not return secrets.
 
 ## Deployment Overview
 
@@ -130,6 +165,7 @@ The main production requirements are:
 - an `OPENAI_API_KEY`
 - a frontend `NEXT_PUBLIC_API_BASE_URL` pointing at the deployed API
 - `APP_CORS_ORIGINS` including the deployed frontend origin
+- `APP_MODEL_NAME=distilbert-base-uncased` unless the backend training path is changed to another compatible classifier
 
 Detailed deployment notes live in `docs/deployment.md`.
 
@@ -139,9 +175,11 @@ Detailed deployment notes live in `docs/deployment.md`.
 - `docs/database.md`
 - `docs/flows.md`
 - `docs/deployment.md`
+- `docs/case-study.md`
 
 ## Notes for Reviewers
 
 - The local backend now bootstraps its own schema, so reviewers do not need a pre-existing database to run tests.
 - The classifier seed generation path is aligned across product copy, tests, and implementation at 90 examples per quick-start run.
+- Runs are persisted as database records with event streams, status endpoints, and replayable trace details.
 - The repository is intentionally scoped as an open-source project, so the focus is clarity, end-to-end flow, and code quality over enterprise-level feature breadth.
