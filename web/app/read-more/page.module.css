@@ -1,7 +1,8 @@
 .page {
   min-height: 100svh;
   position: relative;
-  overflow: clip;
+  overflow-x: clip;
+  padding-bottom: env(safe-area-inset-bottom);
   background:
     radial-gradient(circle at 18% 14%, rgba(111, 132, 119, 0.14), transparent 34%),
     radial-gradient(circle at 82% 18%, rgba(178, 168, 144, 0.18), transparent 30%),
@@ -14,12 +15,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image:
-    linear-gradient(rgba(34, 38, 34, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(34, 38, 34, 0.03) 1px, transparent 1px);
-  background-size: 70px 70px;
-  mask-image: linear-gradient(180deg, rgba(34, 38, 34, 0.24), transparent 86%);
-  opacity: 0.22;
+  display: none;
 }
 
 .shell {
@@ -85,8 +81,9 @@
 
 .brandEyebrow,
 .kicker,
-.asideLabel {
-  color: var(--accent);
+.asideLabel,
+.sectionTitle {
+  color: var(--accent-strong);
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -96,7 +93,7 @@
   font-family: var(--font-display), "Syne", sans-serif;
   font-size: 1.95rem;
   line-height: 0.96;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.03em;
   color: var(--text);
   font-weight: 700;
 }
@@ -114,6 +111,16 @@
   font-size: 0.9rem;
   font-weight: 600;
   white-space: nowrap;
+  touch-action: manipulation;
+}
+
+.brandLink:focus-visible,
+.backLink:focus-visible,
+.primaryCta:focus-visible,
+.secondaryCta:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 4px;
+  border-radius: 8px;
 }
 
 .hero {
@@ -140,7 +147,7 @@
   font-family: var(--font-body), "DM Sans", sans-serif;
   font-size: clamp(2.7rem, 5.2vw, 4.7rem);
   line-height: 1.01;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.03em;
   color: var(--text);
   text-wrap: balance;
   font-weight: 700;
@@ -181,6 +188,7 @@
     transform 140ms ease,
     border-color 140ms ease,
     background-color 140ms ease;
+  touch-action: manipulation;
 }
 
 .primaryCta {
@@ -206,7 +214,7 @@
   display: grid;
   gap: 16px;
   padding: 22px;
-  border-radius: 24px;
+  border-radius: 16px;
   border: 1px solid var(--border-soft);
   background: linear-gradient(180deg, rgba(247, 243, 236, 0.96), rgba(242, 236, 227, 0.96));
   box-shadow:
@@ -235,7 +243,7 @@
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent-soft-3), rgba(178, 168, 144, 0.14));
   border: 1.5px solid rgba(111, 132, 119, 0.22);
-  color: var(--accent);
+  color: var(--accent-strong);
   font-weight: 700;
 }
 
@@ -270,7 +278,7 @@
   font-family: var(--font-body), "DM Sans", sans-serif;
   font-size: 0.78rem;
   font-weight: 800;
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .featureGrid {
@@ -281,7 +289,7 @@
 
 .feature {
   padding: 18px 18px 20px;
-  border-radius: 20px;
+  border-radius: 14px;
   border: 1px solid var(--border-soft);
   background: rgba(247, 243, 236, 0.65);
 }

@@ -312,6 +312,21 @@ function ProcessingShell(props: {
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalShouldFollowRef = useRef(true);
   const logEvents = props.liveEvents.filter((event) => event.message);
+  const stageLabel =
+    props.currentStage === "starting"
+      ? "Starting run"
+      : props.currentStage === "analyzing"
+        ? "Analyzing scope"
+        : props.currentStage === "generating"
+          ? "Generating examples"
+          : props.currentStage === "training"
+            ? "Training classifier"
+            : props.currentStage === "refining"
+              ? "Refining the boundary"
+              : "Finalizing classifier";
+  const liveStatus = props.latestEvent?.message
+    ? `${stageLabel}. ${props.latestEvent.message}`
+    : `${stageLabel}. Waiting for the next event.`;
 
   useLayoutEffect(() => {
     const terminal = terminalRef.current;
@@ -337,7 +352,16 @@ function ProcessingShell(props: {
   }
 
   return (
-    <section ref={props.containerRef} className={styles.takeoverBody} aria-label="Processing experience" tabIndex={-1}>
+    <section
+      ref={props.containerRef}
+      className={styles.takeoverBody}
+      aria-label="Processing experience"
+      aria-busy="true"
+      tabIndex={-1}
+    >
+      <p className="sr-only" role="status" aria-live="polite">
+        {liveStatus}
+      </p>
       <div className={`${styles.composerShell} ${styles.processingShell}`}>
         <section className={`${styles.composerCard} ${styles.processingCard}`} style={{ animation: "demoScaleIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both" }}>
           <header className={styles.composerHeader}>
@@ -438,7 +462,7 @@ function ResultShell(props: {
   return (
     <section className={styles.takeoverBody} aria-label="Completed experience">
       <div className={styles.composerShell}>
-        <section className={`${styles.composerCard} ${styles.resultCard}`} style={{ animation: "demoScaleIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both" }}>
+        <section className={`${styles.composerCard} ${styles.resultCard}`} style={{ animation: "demoScaleIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both" }}>
           <header className={styles.composerHeader}>
             <div className={styles.productLockup}>
               <BrandMark />
@@ -453,7 +477,7 @@ function ResultShell(props: {
           </header>
 
           <div className={styles.composerCopy}>
-            <p className={styles.stageCaption} style={{ color: "#10b981" }}>✓ Ready for production</p>
+            <p className={`${styles.stageCaption} ${styles.stageCaptionSuccess}`}>✓ Ready for production</p>
             <div className={styles.resultPromptCard}>
               <span className={styles.resultPromptLabel}>Original prompt</span>
               <p className={styles.resultPromptText}>
@@ -495,27 +519,27 @@ function ResultShell(props: {
                 className={styles.composerInput}
                 ref={props.testInputRef}
                 type="text"
-                autoComplete="off"
-                inputMode="text"
-                placeholder="Type a ticket or support message…"
-                value={props.testInput}
+              autoComplete="off"
+              inputMode="text"
+              placeholder="Type a ticket or support message…"
+                aria-describedby={props.testError ? "classifier-test-input-error" : undefined}
+                aria-invalid={Boolean(props.testError)}
+              value={props.testInput}
                 onChange={(event) => props.onTestInputChange(event.target.value)}
                 onKeyDown={props.onTestKeyDown}
-                style={{ borderRadius: "16px" }}
               />
               <button
                 className={styles.primaryButton}
                 onClick={props.onClassify}
                 disabled={props.classifying}
                 type="button"
-                style={{ minHeight: "58px" }}
               >
                 <span className={styles.buttonLabel}>Run test</span>
                 {props.classifying && <span className={styles.buttonSpinner} aria-hidden="true" />}
               </button>
             </div>
             {props.testError && (
-              <p className={styles.inlineError} role="alert">
+              <p className={styles.inlineError} id="classifier-test-input-error" role="alert">
                 {props.testError}
               </p>
             )}
@@ -545,7 +569,6 @@ function ResultShell(props: {
                       className={styles.simpleSuggestion}
                       onClick={() => props.onSuggestionClick(item.text)}
                       type="button"
-                      style={{ transition: "all 0.2s ease" }}
                     >
                       <span className={`${styles.seedBadge} ${labelToneClass(item.label)}`}>
                         {labelDisplay(item.label)}
@@ -640,15 +663,54 @@ function ErrorShell(props: {
   );
 }
 
-function LuckyPromptModal(props: { prompt: string; loading: boolean; closing: boolean }) {
+function LuckyPromptModal(props: {
+  prompt: string;
+  loading: boolean;
+  closing: boolean;
+  onCancel: () => void;
+}) {
   const [displayed, setDisplayed] = useState("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const onCancelRef = useRef(props.onCancel);
+
+  useEffect(() => {
+    onCancelRef.current = props.onCancel;
+  }, [props.onCancel]);
 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialogRef.current?.focus();
-    return () => previousFocus?.focus();
+
+    function handleDialogKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCancelRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleDialogKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleDialogKeyDown);
+      previousFocus?.focus();
+    };
   }, []);
 
   useEffect(() => {
@@ -679,26 +741,27 @@ function LuckyPromptModal(props: { prompt: string; loading: boolean; closing: bo
       <div
         ref={dialogRef}
         className={`${styles.luckyModal} ${props.closing ? styles.luckyModalClosing : ""}`}
-        aria-label="Feeling Lucky"
+        aria-labelledby="lucky-modal-title"
+        aria-describedby="lucky-modal-body"
         aria-busy={props.loading}
         role="dialog"
         aria-modal="true"
         tabIndex={-1}
       >
         <p className={styles.luckyModalEyebrow}>Feeling Lucky</p>
-        <h2 className={styles.luckyModalTitle}>
+        <h2 className={styles.luckyModalTitle} id="lucky-modal-title">
           {props.loading ? "Choosing a scope" : "Selected scope"}
         </h2>
         <div className={styles.luckyModalContent}>
           {props.loading ? (
             <div className={styles.luckyModalLoading}>
               <span className={styles.luckyModalSpinner} aria-hidden="true" />
-              <p className={styles.luckyModalBody}>
+              <p className={styles.luckyModalBody} id="lucky-modal-body">
                 Finding a realistic chatbot boundary for the demo…
               </p>
             </div>
           ) : (
-            <p className={styles.luckyModalBody}>
+            <p className={styles.luckyModalBody} id="lucky-modal-body">
               <span aria-hidden="true" style={{ visibility: "hidden" }}>{props.prompt}</span>
               <span className={styles.luckyModalTyped} aria-live="polite">
                 {displayed}
@@ -706,6 +769,11 @@ function LuckyPromptModal(props: { prompt: string; loading: boolean; closing: bo
               </span>
             </p>
           )}
+        </div>
+        <div className={styles.luckyModalActions}>
+          <button className={styles.secondaryButton} onClick={props.onCancel} type="button">
+            Cancel
+          </button>
         </div>
       </div>
     </>
@@ -986,6 +1054,8 @@ export default function HomePage() {
   const activityIndexRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
   const stageGateUntilRef = useRef<number>(0);
+  const luckyTriggerRef = useRef<HTMLButtonElement>(null);
+  const luckyCancelledRef = useRef(false);
 
   const [view, setView] = useState<ViewState>("idle");
   const [idleStep, setIdleStep] = useState<IdleStep>("welcome");
@@ -1215,6 +1285,7 @@ export default function HomePage() {
   async function handleFeelingLucky() {
     if (submitting || luckyLoading) return;
 
+    luckyCancelledRef.current = false;
     setLuckyLoading(true);
     setLuckyPreviewPrompt("");
     setLuckyModalClosing(false);
@@ -1222,21 +1293,33 @@ export default function HomePage() {
     try {
       await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
       const result = await api.luckyPrompt();
+      if (luckyCancelledRef.current) return;
       setDescription(result.description);
       setLuckyPreviewPrompt(result.description);
-      await new Promise((resolve) => window.setTimeout(resolve, 5000));
+      await new Promise((resolve) => window.setTimeout(resolve, 2200));
+      if (luckyCancelledRef.current) return;
       setLuckyModalClosing(true);
       await new Promise((resolve) => window.setTimeout(resolve, 420));
+      if (luckyCancelledRef.current) return;
       beginProcessing("lucky", result.description);
       setLuckyLoading(false);
       pushActivity("Selected a strong starting brief", truncate(result.description, 120), "success");
       await startQuickStart(result.description, { skipAnalyzeStep: true });
     } catch (err) {
+      if (luckyCancelledRef.current) return;
       setLuckyPreviewPrompt("");
       setLuckyModalClosing(false);
       setLuckyLoading(false);
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
     }
+  }
+
+  function handleCancelLucky() {
+    luckyCancelledRef.current = true;
+    setLuckyLoading(false);
+    setLuckyPreviewPrompt("");
+    setLuckyModalClosing(false);
+    requestAnimationFrame(() => luckyTriggerRef.current?.focus());
   }
 
   function changeSeedPage(label: DemoLabel, direction: -1 | 1) {
@@ -1582,7 +1665,7 @@ export default function HomePage() {
 
   useLayoutEffect(() => {
     document.documentElement.style.overflow =
-      view === "idle" && !drawerOpen && !luckyLoading && !luckyPreviewPrompt ? "" : "hidden";
+      drawerOpen || luckyLoading || luckyPreviewPrompt ? "hidden" : "";
     return () => {
       document.documentElement.style.overflow = "";
     };
@@ -1839,9 +1922,14 @@ export default function HomePage() {
           </div>
 
           <div className={styles.launchPanel}>
-            <label className="sr-only" htmlFor="classifier-description">
-              Classifier description
-            </label>
+            <div className={styles.composerFieldIntro}>
+              <label className={styles.composerFieldLabel} htmlFor="classifier-description">
+                Define the assistant’s scope
+              </label>
+              <p className={styles.composerFieldHint} id="classifier-description-hint">
+                Say what it should handle and what it should decline. Keep it specific enough to test.
+              </p>
+            </div>
             <textarea
               id="classifier-description"
               className={styles.textarea}
@@ -1849,7 +1937,14 @@ export default function HomePage() {
               rows={5}
               autoComplete="off"
               name="classifier_description"
-              placeholder="Customer support for a food-delivery app. Accept orders, tracking, refunds, driver ETA, account and payment issues, menu and allergen questions. Reject recipes, jokes, coding help, general chit-chat."
+              required
+              aria-describedby={
+                error
+                  ? "classifier-description-hint classifier-description-error"
+                  : "classifier-description-hint"
+              }
+              aria-invalid={Boolean(error)}
+              placeholder="e.g. Orders, delivery, and refunds. Decline recipes and unrelated questions…"
               value={description}
               onChange={(event) => {
                 setDescription(event.target.value);
@@ -1858,7 +1953,7 @@ export default function HomePage() {
               onKeyDown={handlePromptKey}
             />
             {error && (
-              <p className={styles.inlineError} role="alert">
+              <p className={styles.inlineError} id="classifier-description-error" role="alert">
                 {error}
               </p>
             )}
@@ -1896,15 +1991,16 @@ export default function HomePage() {
               </button>
 
               <button
+                ref={luckyTriggerRef}
                 className={styles.luckyButton}
                 disabled={submitting || luckyLoading}
+                aria-busy={luckyLoading}
                 onClick={() => void handleFeelingLucky()}
                 type="button"
               >
                 <span className={styles.luckySpark} aria-hidden="true" />
-                <span className={styles.buttonLabel}>
-                  {luckyLoading ? "Picking a scope…" : "Feeling Lucky"}
-                </span>
+                <span className={styles.buttonLabel}>Feeling Lucky</span>
+                {luckyLoading && <span className={styles.buttonSpinner} aria-hidden="true" />}
               </button>
             </div>
           </div>
@@ -2009,6 +2105,7 @@ export default function HomePage() {
             loading={!luckyPreviewPrompt}
             prompt={luckyPreviewPrompt}
             closing={luckyModalClosing}
+            onCancel={handleCancelLucky}
           />
         )}
       </main>

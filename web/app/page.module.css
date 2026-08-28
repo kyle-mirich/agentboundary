@@ -1,7 +1,9 @@
 .page {
   position: relative;
   min-height: 100svh;
-  overflow: clip;
+  overflow-x: clip;
+  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
   background:
     radial-gradient(circle at top left, rgba(178, 168, 144, 0.22), transparent 38%),
     radial-gradient(circle at 85% 15%, var(--accent-soft), transparent 32%),
@@ -25,11 +27,7 @@
 }
 
 .page::after {
-  background-image: linear-gradient(rgba(34, 38, 34, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(34, 38, 34, 0.03) 1px, transparent 1px);
-  background-size: 72px 72px;
-  mask-image: linear-gradient(180deg, rgba(34, 38, 34, 0.22), transparent 85%);
-  opacity: 0.2;
+  display: none;
 }
 
 .idleStage,
@@ -121,7 +119,7 @@
   display: grid;
   gap: 28px;
   padding: 32px;
-  border-radius: 32px;
+  border-radius: 24px;
   background: linear-gradient(180deg, var(--cream-2), var(--cream-4));
   border: 1px solid var(--border-soft);
   box-shadow:
@@ -205,6 +203,9 @@
 }
 
 .landingNavLink {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   color: var(--text-2);
   font-size: 1.1rem;
   font-weight: 500;
@@ -218,8 +219,15 @@
 
 .landingNavLink:hover,
 .landingNavLink:focus-visible {
-  color: var(--accent);
+  color: var(--accent-strong);
   text-decoration: none;
+}
+
+.landingNavLink:focus-visible,
+.resultFooterLink:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 4px;
+  border-radius: 6px;
 }
 
 .welcomeBrand {
@@ -240,7 +248,7 @@
   position: relative;
   width: min(920px, 100%);
   padding: clamp(32px, 4vw, 48px);
-  border-radius: 24px;
+  border-radius: 20px;
   border: 1px solid var(--border-soft);
   background: linear-gradient(180deg, rgba(248, 245, 239, 0.94), var(--cream-4));
   box-shadow:
@@ -324,7 +332,7 @@
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent-soft-3), rgba(178, 168, 144, 0.14));
   border: 1.5px solid rgba(111, 132, 119, 0.28);
-  color: var(--accent);
+  color: var(--accent-strong);
   font-family: var(--font-body), "DM Sans", sans-serif;
   font-weight: 700;
   font-size: 0.98rem;
@@ -368,7 +376,7 @@
 
 .welcomeKicker {
   margin: 0;
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 0.88rem;
   font-weight: 600;
   line-height: 1.4;
@@ -404,7 +412,7 @@
 }
 
 .welcomeStackLabel {
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -495,7 +503,7 @@
 }
 
 .productEyebrow {
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .productName {
@@ -662,7 +670,7 @@
 
 .welcomeExampleLabel {
   margin: 0;
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -762,7 +770,7 @@
 .userMessage {
   background: none;
   border: none;
-  color: #3d443e;
+  color: var(--text);
   padding: 0;
   position: relative;
   display: flex;
@@ -773,7 +781,7 @@
 
 .userMessage::before {
   content: "user ";
-  color: var(--accent);
+  color: var(--accent-strong);
   font-weight: 600;
   margin-right: 6px;
   flex-shrink: 0;
@@ -782,20 +790,24 @@
 .botMessage {
   background: none;
   border: none;
-  color: #5b625c;
+  color: var(--text-2);
   padding: 0;
   position: relative;
 }
 
 .botMessage::before {
   content: "agent ";
-  color: #6b8a76;
+  color: var(--accent-strong);
   font-weight: 600;
   margin-right: 6px;
 }
 
 .classificationBadge {
-  display: inline;
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
   gap: 0;
   padding: 0;
   border-radius: 0;
@@ -805,12 +817,12 @@
   margin: 0 0 0 12px;
   font-family: var(--font-mono), "JetBrains Mono", monospace;
   font-size: 0.9rem;
-  white-space: nowrap;
-  flex-shrink: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .classificationValue {
-  color: #f7b347;
+  color: var(--amber-strong);
   font-weight: 500;
   line-height: 1.7;
 }
@@ -861,9 +873,9 @@
 
 .hoverTooltipWide {
   width: fit-content;
-  min-width: 420px;
+  min-width: 0;
   max-width: min(560px, calc(100vw - 48px));
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .hoverTooltip::after {
@@ -905,7 +917,7 @@
 }
 
 .heroIntro {
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .welcomeStack {
@@ -987,7 +999,7 @@
 .summaryCard,
 .resultSurface,
 .errorCard {
-  border-radius: 28px;
+  border-radius: 20px;
 }
 
 .launchPanel {
@@ -1043,7 +1055,7 @@
 
 .textarea::placeholder,
 .composerInput::placeholder {
-  color: var(--text-3);
+  color: var(--text-muted-on-light);
 }
 
 .textarea:focus-visible,
@@ -1052,6 +1064,7 @@
 .secondaryButton:focus-visible,
 .luckyButton:focus-visible,
 .ghostButton:focus-visible,
+.composerExampleChip:focus-visible,
 .suggestionChip:focus-visible,
 .seedPagerButton:focus-visible,
 .drawerClose:focus-visible {
@@ -1084,6 +1097,25 @@
   gap: 8px;
 }
 
+.composerFieldIntro {
+  display: grid;
+  gap: 4px;
+}
+
+.composerFieldLabel {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.composerFieldHint {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--text-2);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 .composerExampleChip {
   display: flex;
   flex-direction: column;
@@ -1091,29 +1123,29 @@
   gap: 2px;
   padding: 10px 14px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-md);
+  background: var(--surface-4);
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .composerExampleChip:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: var(--surface-3);
+  border-color: var(--border-lg);
 }
 
 .composerExampleChipLabel {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-secondary, rgba(255, 255, 255, 0.5));
+  color: var(--text-2);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .composerExampleChipBody {
   font-size: 13px;
-  color: var(--color-text, rgba(255, 255, 255, 0.8));
+  color: var(--text);
   line-height: 1.4;
 }
 
@@ -1294,7 +1326,7 @@
 
 .previewNumber {
   min-width: 2.4rem;
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .takeoverStage {
@@ -1597,7 +1629,7 @@
 }
 
 .processingSummaryLabel {
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1712,7 +1744,7 @@
 }
 
 .panelLabel {
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .timelineItem {
@@ -1824,6 +1856,10 @@
 
 .stageCaption {
   color: #96baff;
+}
+
+.stageCaptionSuccess {
+  color: var(--accent-strong);
 }
 
 .stageTitle {
@@ -2025,7 +2061,7 @@
 }
 
 .seedPagerButton {
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 12px;
 }
 
@@ -2141,7 +2177,7 @@
 }
 
 .resultPromptLabel {
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -2203,6 +2239,7 @@
 .composerInput {
   min-height: 58px;
   padding-block: 0;
+  border-radius: 16px;
 }
 
 .featuredResult,
@@ -2224,12 +2261,24 @@
   align-items: flex-start;
   padding: 14px 16px;
   border-radius: 18px;
-  border: 1px solid var(--surface-faint-2);
-  background: var(--surface-faint);
+  border: 1px solid var(--border);
+  background: var(--surface-4);
   color: var(--text);
   text-align: left;
   font: inherit;
   cursor: pointer;
+  transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.simpleSuggestion:hover {
+  transform: translateY(-1px);
+  background: var(--surface-3);
+  border-color: var(--border-lg);
+}
+
+.simpleSuggestion:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 3px;
 }
 
 .simpleSuggestion > span:last-child {
@@ -2269,7 +2318,10 @@
 }
 
 .resultFooterLink {
-  color: var(--accent-2);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent-strong);
   font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -2278,7 +2330,7 @@
 
 .resultFooterLink:hover,
 .resultFooterLink:focus-visible {
-  color: var(--accent);
+  color: var(--accent-strong);
   text-decoration: underline;
 }
 
@@ -2303,13 +2355,24 @@
   animation: luckyModalIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.luckyModalActions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.luckyModalActions .secondaryButton {
+  width: auto;
+  min-width: 112px;
+}
+
 .luckyModalClosing {
   animation: luckyModalOut 760ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .luckyModalEyebrow {
   margin: 0;
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -2380,7 +2443,7 @@
   height: 18px;
   border-radius: 999px;
   border: 2px solid var(--accent-soft-5);
-  border-top-color: var(--accent);
+  border-top-color: var(--accent-strong);
   flex-shrink: 0;
   animation: spin 0.8s linear infinite;
 }
@@ -2616,7 +2679,7 @@
 }
 
 .traceHeroLabel {
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -2731,7 +2794,7 @@
   right: 16px;
   top: 50%;
   transform: translateY(-50%) rotate(0deg);
-  color: var(--accent);
+  color: var(--accent-strong);
   font-family: var(--font-mono), "JetBrains Mono", monospace;
   font-size: 1.2rem;
   line-height: 1;
@@ -2807,7 +2870,7 @@
   position: absolute;
   right: 16px;
   top: 16px;
-  color: var(--accent);
+  color: var(--accent-strong);
   font-family: var(--font-mono), "JetBrains Mono", monospace;
   font-size: 1.1rem;
   line-height: 1;
@@ -2836,7 +2899,7 @@
 }
 
 .traceEventType {
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -2844,7 +2907,7 @@
 }
 
 .traceEventTime {
-  color: var(--text-3);
+  color: var(--text-muted-on-light);
   font-family: var(--font-mono), "JetBrains Mono", monospace;
   font-size: 0.78rem;
 }
@@ -3194,9 +3257,191 @@
   }
 }
 
+@media (max-width: 480px) {
+  .classificationBadge {
+    flex-basis: 100%;
+    margin: 4px 0 0;
+  }
+
+  .luckyModal {
+    width: min(100vw - 24px, 560px);
+    padding: 20px;
+  }
+}
+
+@media (max-width: 380px) {
+  .landingNav {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .landingNavLinks {
+    justify-content: flex-start;
+    gap: 8px 14px;
+  }
+}
+
+/* ═══ Desktop: every view fits the viewport exactly ═══ */
+@media (min-width: 861px) {
+  /* Shared shell for the fixed takeover screens (processing + result) */
+  .takeoverBody {
+    height: 100svh;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+    padding: clamp(10px, 2vh, 24px) 0 clamp(10px, 1.5vh, 16px);
+    gap: 8px;
+  }
+
+  .processingShell,
+  .takeoverStage .composerShell {
+    min-height: 0;
+    height: 100%;
+    padding: 0;
+    align-content: stretch;
+  }
+
+  /* Processing: terminal fills whatever space the viewport leaves */
+  .processingCard {
+    height: auto;
+    min-height: 0;
+    gap: clamp(12px, 2vh, 22px);
+    padding: clamp(18px, 2.4vw, 28px);
+  }
+
+  .processingTerminalWrap {
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  :global(.terminal-panel).processingTerminal {
+    height: 100%;
+    max-height: none;
+    min-height: 0;
+  }
+
+  /* Result: exact viewport-height card, surface scrolls internally */
+  .resultCard {
+    height: auto;
+    max-height: none;
+    gap: clamp(10px, 1.8vh, 16px);
+    padding: clamp(16px, 2.4vh, 22px) clamp(18px, 2vw, 22px) clamp(14px, 2vh, 18px);
+  }
+
+  .resultPromptText {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Error: centered card, never pushes past the viewport */
+  .errorShell {
+    height: 100svh;
+    min-height: 0;
+  }
+
+  .errorCard {
+    max-height: 100%;
+    overflow-y: auto;
+  }
+
+  /* Welcome: compress vertical rhythm with vh so it always fits */
+  .welcomeShell {
+    height: 100svh;
+    min-height: 0;
+    padding: clamp(14px, 2.5vh, 32px) 0 clamp(12px, 2vh, 24px);
+    overflow-y: auto;
+  }
+
+  .welcomeHero {
+    height: 100%;
+    min-height: 0;
+    align-content: start;
+    gap: clamp(10px, 1.6vh, 18px);
+  }
+
+  .welcomeMain {
+    min-height: 0;
+    gap: clamp(14px, 2.2vh, 26px);
+    padding: clamp(20px, 3vh, 36px) clamp(28px, 3.5vw, 44px);
+  }
+
+  .welcomeLead {
+    gap: clamp(12px, 1.8vh, 22px);
+  }
+
+  .welcomeTitle {
+    font-size: clamp(1.9rem, min(3.2vw, 5.2vh), 3rem);
+  }
+
+  .welcomeStepsSection {
+    padding-top: clamp(12px, 1.8vh, 24px);
+  }
+
+  .stepNumber {
+    width: clamp(30px, 4.6vh, 38px);
+    height: clamp(30px, 4.6vh, 38px);
+  }
+
+  .welcomeSide {
+    padding-top: clamp(12px, 1.8vh, 24px);
+    gap: clamp(10px, 1.6vh, 18px);
+  }
+
+  .welcomeExample {
+    gap: clamp(10px, 1.4vh, 16px);
+    padding: clamp(14px, 2vh, 22px);
+  }
+
+  .welcomePrimaryButton {
+    min-height: clamp(46px, 5.6vh, 56px);
+  }
+
+  .welcomeStackRow {
+    gap: clamp(8px, 1.2vh, 12px);
+  }
+
+  .welcomeStackItem {
+    min-height: clamp(30px, 4vh, 36px);
+  }
+
+  /* Compose: same viewport-fit treatment */
+  .composerShell {
+    height: 100svh;
+    min-height: 0;
+    padding: clamp(16px, 3vh, 44px) 0 clamp(14px, 2vh, 28px);
+    overflow-y: auto;
+  }
+
+  .composerCard {
+    min-height: 0;
+    gap: clamp(14px, 2.2vh, 28px);
+    padding: clamp(20px, 3vh, 32px);
+  }
+
+  .composerTitle {
+    font-size: clamp(1.7rem, min(3.2vw, 5vh), 2.8rem);
+  }
+
+  .textarea {
+    min-height: clamp(88px, 14vh, 168px);
+  }
+
+  .composerExamples {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .idleStage,
   .takeoverStage,
+  .processingCard,
+  .resultCard,
+  .simpleResult,
+  .luckyModal,
   .progressFill,
   .primaryButton,
   .secondaryButton,
