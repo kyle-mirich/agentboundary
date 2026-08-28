@@ -22,6 +22,27 @@
     0 8px 24px rgba(60, 50, 35, 0.08);
 }
 
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(111, 132, 119, 0.12);
+  border: 1px solid rgba(111, 132, 119, 0.22);
+  color: #4f6f59;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.badgeIcon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 .spinner {
   width: 40px;
   height: 40px;
@@ -54,6 +75,21 @@
   font-variant-numeric: tabular-nums;
 }
 
+.progress {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(60, 50, 35, 0.1);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6f8477, #4f6f59);
+  transition: width 1s linear;
+}
+
 .hint {
   margin: 0;
   font-size: 0.85rem;
@@ -70,5 +106,9 @@
 @media (prefers-reduced-motion: reduce) {
   .spinner {
     animation-duration: 3s;
+  }
+
+  .progressFill {
+    transition: none;
   }
 }
