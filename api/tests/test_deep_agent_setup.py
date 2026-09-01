@@ -2,7 +2,9 @@ import json
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import httpx
 import pytest
+from openai import BadRequestError
 
 from app import config as config_module
 from app.database import get_connection, utc_now
@@ -238,6 +240,100 @@ def test_generate_candidates_keeps_fixed_seed_baseline_without_focus_note():
     assert result["mode"] == "fixed_seed_baseline"
     assert candidate_path.exists()
     assert candidate_path.read_text() == ""
+
+
+def test_generate_candidates_keeps_successful_batches_when_ambiguous_prompt_is_blocked():
+    repository = Repository()
+    project = repository.create_project(
+        ProjectCreate(
+            name="Support",
+            support_domain_description="Symptoms and appointments. No prescriptions or diagnoses.",
+            sandbox_profile="isolated_fs",
+        ),
+        session_id="test-session",
+    )
+    repository.add_examples(
+        project.id,
+        [ExampleInput(text=f"seed {index}", label=Label.IN_SCOPE) for index in range(5)]
+        + [ExampleInput(text=f"other {index}", label=Label.OUT_OF_SCOPE) for index in range(5)]
+        + [ExampleInput(text=f"mixed {index}", label=Label.AMBIGUOUS) for index in range(3)],
+    )
+    run = repository.create_run(project.id, str(config_module.settings.workspace_dir / "pending"))
+    workspace_root = config_module.settings.workspace_dir / run.id
+    workspace = LocalWorkspaceIO(workspace_root)
+    workspace.ensure()
+    context = AgentContext(
+        repository=repository,
+        project_id=project.id,
+        run_id=run.id,
+        workspace=workspace,
+        artifacts_root=config_module.settings.artifacts_dir,
+    )
+
+    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    blocked_response = httpx.Response(
+        400,
+        request=request,
+        json={
+            "error": {
+                "message": "Invalid prompt",
+                "type": "invalid_request_error",
+                "code": "invalid_prompt",
+            }
+        },
+    )
+    blocked_error = BadRequestError(
+        "Invalid prompt",
+        response=blocked_response,
+        body=blocked_response.json(),
+    )
+
+    class FakeResponses:
+        calls = 0
+
+        def parse(self, **kwargs):
+            self.calls += 1
+            if self.calls == 3:
+                raise blocked_error
+            label = "in-scope" if self.calls == 1 else "out-of-scope"
+            return SimpleNamespace(
+                output=[
+                    SimpleNamespace(
+                        type="message",
+                        content=[SimpleNamespace(type="output_text", parsed=SimpleNamespace(examples=[f"{label} candidate"]))],
+                    )
+                ]
+            )
+
+    fake_client = SimpleNamespace(responses=FakeResponses())
+    with (
+        patch.object(config_module.settings, "openai_api_key", "test-key"),
+        patch("app.deep_agent.OpenAI", return_value=fake_client),
+    ):
+        tools = _make_tools(context)
+
+    generate_candidates = next(tool for tool in tools if tool.name == "generate_candidates")
+    raw_result = generate_candidates.invoke(
+        {
+            "round_index": 3,
+            "focus_note": "Target ambiguous boundary cases: tentative or underspecified reports",
+        }
+    )
+
+    result = json.loads(raw_result)
+    candidate_path = workspace_root / "datasets" / "round-03-candidates.jsonl"
+    events = repository.list_run_events(run.id)
+
+    assert result["generated_count"] == 2
+    assert candidate_path.read_text().count("\n") == 1
+    skipped_events = [event for event in events if event.event_type == "generation_skipped"]
+    assert len(skipped_events) == 1
+    assert skipped_events[0].payload == {
+        "reason": "invalid_prompt",
+        "label": "ambiguous",
+        "phase": "candidate",
+        "count": 8,
+    }
 
 
 def test_run_round_uses_recorded_candidate_file_when_agent_passes_wrong_path():

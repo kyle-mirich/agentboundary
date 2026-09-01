@@ -11,7 +11,7 @@ from deepagents.backends import CompositeBackend, FilesystemBackend, StateBacken
 from langchain.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
-from openai import OpenAI
+from openai import BadRequestError, OpenAI
 from pydantic import BaseModel, Field
 
 from .config import settings
@@ -113,6 +113,13 @@ class GeneratedExampleBatch(BaseModel):
 
 class GeneratedTextBatch(BaseModel):
     examples: list[str] = Field(default_factory=list)
+
+
+def _is_invalid_prompt_error(exc: Exception) -> bool:
+    if not isinstance(exc, BadRequestError) or not isinstance(exc.body, dict):
+        return False
+    error = exc.body.get("error")
+    return isinstance(error, dict) and error.get("code") == "invalid_prompt"
 
 
 def _round_paths(round_index: int) -> dict[str, str]:
@@ -258,13 +265,23 @@ def _make_tools(context: AgentContext) -> list:
             f"Generating {n} {message_scope} {generation_phase} examples",
             {"topic": topic, "count": n, "label": label.value, "phase": generation_phase},
         )
-        parsed = parse_structured_response(
-            (
-                f"Create {n} distinct examples for the topic '{topic}'. "
-                f"These examples should be {'clearly in-scope texts about that topic' if on_topic else 'clearly out-of-scope texts about other topics'}. "
-                "Return plain user messages only."
+        try:
+            parsed = parse_structured_response(
+                (
+                    f"Create {n} distinct examples for the topic '{topic}'. "
+                    f"These examples should be {'clearly in-scope texts about that topic' if on_topic else 'clearly out-of-scope texts about other topics'}. "
+                    "Return plain user messages only."
+                )
             )
-        )
+        except BadRequestError as exc:
+            if not _is_invalid_prompt_error(exc):
+                raise
+            emit(
+                "generation_skipped",
+                f"Skipped {n} {message_scope} {generation_phase} examples after the provider rejected the prompt",
+                {"reason": "invalid_prompt", "label": label.value, "phase": generation_phase, "count": n},
+            )
+            return []
         return [
             GeneratedExample(text=item.strip(), label=label, source=source)
             for item in parsed.examples
@@ -281,13 +298,28 @@ def _make_tools(context: AgentContext) -> list:
             f"Generating {n} ambiguous {generation_phase} examples",
             {"topic": topic, "count": n, "label": Label.AMBIGUOUS.value, "phase": generation_phase},
         )
-        parsed = parse_structured_response(
-            (
-                f"Create {n} ambiguous examples for the topic '{topic}'. "
-                "Each example must mix an in-scope topic with an out-of-scope topic, or remain genuinely unclear. "
-                "Return plain user messages only."
+        try:
+            parsed = parse_structured_response(
+                (
+                    f"Create {n} ambiguous examples for the topic '{topic}'. "
+                    "Each example must mix an in-scope topic with an out-of-scope topic, or remain genuinely unclear. "
+                    "Return plain user messages only."
+                )
             )
-        )
+        except BadRequestError as exc:
+            if not _is_invalid_prompt_error(exc):
+                raise
+            emit(
+                "generation_skipped",
+                f"Skipped {n} ambiguous {generation_phase} examples after the provider rejected the prompt",
+                {
+                    "reason": "invalid_prompt",
+                    "label": Label.AMBIGUOUS.value,
+                    "phase": generation_phase,
+                    "count": n,
+                },
+            )
+            return []
         return [
             GeneratedExample(text=item.strip(), label=Label.AMBIGUOUS, source=ExampleSource.SYNTHETIC_AMBIGUOUS)
             for item in parsed.examples
