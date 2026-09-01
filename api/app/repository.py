@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import random
 import sqlite3
 import uuid
 from collections import Counter
-from datetime import datetime
-from typing import Iterable
+from datetime import datetime, timezone
+from typing import Any, Iterable
 
 import psycopg2.errors
 
@@ -115,38 +116,47 @@ class Repository:
         split: Split | None = None,
     ) -> list[ExampleRecord]:
         now = utc_now()
+        created_at = _dt(now)
         example_rows: list[ExampleRecord] = []
-        with get_connection() as connection:
-            for payload in payloads:
-                example_id = str(uuid.uuid4())
-                connection.execute(
+        rows: list[tuple[Any, ...]] = []
+
+        for payload in payloads:
+            example_id = str(uuid.uuid4())
+            text = payload.text.strip()
+            rows.append(
+                (
+                    example_id,
+                    project_id,
+                    text,
+                    payload.label.value,
+                    payload.source.value,
+                    payload.approved,
+                    split.value if split else None,
+                    now,
+                )
+            )
+            example_rows.append(
+                ExampleRecord(
+                    id=example_id,
+                    project_id=project_id,
+                    text=text,
+                    label=payload.label,
+                    source=payload.source,
+                    approved=payload.approved,
+                    split=split,
+                    created_at=created_at,
+                )
+            )
+
+        if rows:
+            with get_connection() as connection:
+                connection.executemany(
                     """
                     INSERT INTO examples (
                         id, project_id, text, label, source, approved, split, created_at
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
-                    (
-                        example_id,
-                        project_id,
-                        payload.text.strip(),
-                        payload.label.value,
-                        payload.source.value,
-                        payload.approved,
-                        split.value if split else None,
-                        now,
-                    ),
-                )
-                example_rows.append(
-                    ExampleRecord(
-                        id=example_id,
-                        project_id=project_id,
-                        text=payload.text.strip(),
-                        label=payload.label,
-                        source=payload.source,
-                        approved=payload.approved,
-                        split=split,
-                        created_at=_dt(now),
-                    )
+                    rows,
                 )
         return example_rows
 
@@ -205,12 +215,19 @@ class Repository:
             per_label: dict[str, list[str]] = {}
             for row in rows:
                 per_label.setdefault(row["label"], []).append(row["id"])
+            # Sample the eval split instead of taking the oldest rows, so a
+            # label-ordered seed response cannot bias the locked eval set. The
+            # RNG is seeded per project so the split stays stable across calls.
+            rng = random.Random(f"{project_id}:{settings.random_seed}")
             eval_ids = set()
-            for ids in per_label.values():
+            for label in sorted(per_label):
+                ids = per_label[label]
                 if not ids:
                     continue
                 holdout_count = max(1, int(len(ids) * settings.eval_holdout_ratio))
-                eval_ids.update(ids[:holdout_count])
+                shuffled = list(ids)
+                rng.shuffle(shuffled)
+                eval_ids.update(shuffled[:holdout_count])
 
             if eval_ids:
                 connection.executemany(
@@ -248,7 +265,16 @@ class Repository:
         summary: str | None = None,
     ) -> RunRecord:
         run = self.get_run(run_id)
-        status_value = status.value if status else run.status.value
+        updated = run.model_copy(
+            update={
+                "status": status or run.status,
+                "stop_reason": stop_reason if stop_reason is not None else run.stop_reason,
+                "best_round_id": best_round_id if best_round_id is not None else run.best_round_id,
+                "best_macro_f1": best_macro_f1 if best_macro_f1 is not None else run.best_macro_f1,
+                "summary": summary if summary is not None else run.summary,
+                "updated_at": _dt(utc_now()),
+            }
+        )
         with get_connection() as connection:
             connection.execute(
                 """
@@ -257,16 +283,84 @@ class Repository:
                 WHERE id = %s
                 """,
                 (
-                    status_value,
-                    stop_reason if stop_reason is not None else run.stop_reason,
-                    best_round_id if best_round_id is not None else run.best_round_id,
-                    best_macro_f1 if best_macro_f1 is not None else run.best_macro_f1,
-                    summary if summary is not None else run.summary,
-                    utc_now(),
+                    updated.status.value,
+                    updated.stop_reason,
+                    updated.best_round_id,
+                    updated.best_macro_f1,
+                    updated.summary,
+                    updated.updated_at.isoformat(),
                     run_id,
                 ),
             )
+        return updated
+
+    def update_run_workspace(self, run_id: str, workspace_root: str) -> RunRecord:
+        now = utc_now()
+        with get_connection() as connection:
+            connection.execute(
+                "UPDATE runs SET workspace_root = %s, updated_at = %s WHERE id = %s",
+                (workspace_root, now, run_id),
+            )
         return self.get_run(run_id)
+
+    def reconcile_interrupted_runs(self, max_age_seconds: int | None = None) -> list[str]:
+        """Fail runs that can no longer progress.
+
+        Run pipelines execute as in-process background tasks, so a restart
+        silently orphans every `queued`/`running` row. Those runs would other-
+        wise stream forever because nothing ever moves them to a terminal
+        state.
+        """
+        timeout = max_age_seconds if max_age_seconds is not None else settings.orphaned_run_timeout_seconds
+        cutoff = datetime.now(timezone.utc).timestamp() - timeout
+        cutoff_iso = datetime.fromtimestamp(cutoff, timezone.utc).isoformat()
+        now = utc_now()
+        with get_connection() as connection:
+            stale = connection.execute(
+                """
+                SELECT r.id
+                FROM runs r
+                LEFT JOIN run_events re ON re.run_id = r.id
+                WHERE r.status IN (%s, %s)
+                GROUP BY r.id, r.updated_at
+                HAVING COALESCE(MAX(re.created_at), r.updated_at) < %s
+                """,
+                (RunStatus.QUEUED.value, RunStatus.RUNNING.value, cutoff_iso),
+            ).fetchall()
+            run_ids = [row["id"] for row in stale]
+            if run_ids:
+                connection.executemany(
+                    """
+                    UPDATE runs
+                    SET status = %s, stop_reason = %s, summary = %s, updated_at = %s
+                    WHERE id = %s
+                    """,
+                    [
+                        (
+                            RunStatus.FAILED.value,
+                            "Run stopped producing progress and was marked failed",
+                            "Run interrupted",
+                            now,
+                            run_id,
+                        )
+                        for run_id in run_ids
+                    ],
+                )
+        return run_ids
+
+    def _run_row_to_model(self, row) -> RunRecord:
+        return RunRecord(
+            id=row["id"],
+            project_id=row["project_id"],
+            status=RunStatus(row["status"]),
+            stop_reason=row["stop_reason"],
+            best_round_id=row["best_round_id"],
+            best_macro_f1=row["best_macro_f1"],
+            summary=row["summary"],
+            workspace_root=row["workspace_root"],
+            created_at=_dt(row["created_at"]),
+            updated_at=_dt(row["updated_at"]),
+        )
 
     def get_run(self, run_id: str, *, session_id: str | None = None) -> RunRecord:
         with get_connection() as connection:
@@ -284,18 +378,19 @@ class Repository:
                 ).fetchone()
         if row is None:
             raise KeyError(f"Run {run_id} not found")
-        return RunRecord(
-            id=row["id"],
-            project_id=row["project_id"],
-            status=RunStatus(row["status"]),
-            stop_reason=row["stop_reason"],
-            best_round_id=row["best_round_id"],
-            best_macro_f1=row["best_macro_f1"],
-            summary=row["summary"],
-            workspace_root=row["workspace_root"],
-            created_at=_dt(row["created_at"]),
-            updated_at=_dt(row["updated_at"]),
-        )
+        return self._run_row_to_model(row)
+
+    def has_active_run(self, project_id: str) -> bool:
+        with get_connection() as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM runs
+                WHERE project_id = %s AND status IN (%s, %s)
+                """,
+                (project_id, RunStatus.QUEUED.value, RunStatus.RUNNING.value),
+            ).fetchone()
+        return bool(row["total"])
 
     def create_run_event(
         self,
@@ -306,6 +401,7 @@ class Repository:
         payload: dict | None = None,
     ) -> RunEventRecord:
         now = utc_now()
+        resolved_payload = payload or {}
         with get_connection() as connection:
             cursor = connection.execute(
                 """
@@ -313,10 +409,17 @@ class Repository:
                 VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (run_id, event_type, message, encode_json(payload or {}), now),
+                (run_id, event_type, message, encode_json(resolved_payload), now),
             )
             event_id = cursor.lastrowid
-        return self.get_run_event(event_id)
+        return RunEventRecord(
+            id=event_id,
+            run_id=run_id,
+            event_type=event_type,
+            message=message,
+            payload=resolved_payload,
+            created_at=_dt(now),
+        )
 
     def get_run_event(self, event_id: int) -> RunEventRecord:
         with get_connection() as connection:
@@ -379,7 +482,7 @@ class Repository:
                 "SELECT * FROM runs WHERE project_id = %s ORDER BY created_at DESC",
                 (project_id,),
             ).fetchall()
-        return [self.get_run(row["id"]) for row in rows]
+        return [self._run_row_to_model(row) for row in rows]
 
     def create_round(self, run_id: str, round_index: int, candidate_file: str) -> RoundRecord:
         round_id = str(uuid.uuid4())
@@ -419,6 +522,21 @@ class Repository:
         note: str | None = None,
     ) -> RoundRecord:
         current = self.get_round(round_id)
+        updated = current.model_copy(
+            update={
+                "status": status or current.status,
+                "dataset_summary_file": dataset_summary_file if dataset_summary_file is not None else current.dataset_summary_file,
+                "review_file": review_file if review_file is not None else current.review_file,
+                "evaluation_file": evaluation_file if evaluation_file is not None else current.evaluation_file,
+                "holdout_file": holdout_file if holdout_file is not None else current.holdout_file,
+                "holdout_evaluation_file": holdout_evaluation_file if holdout_evaluation_file is not None else current.holdout_evaluation_file,
+                "metrics": metrics if metrics is not None else current.metrics,
+                "holdout_metrics": holdout_metrics if holdout_metrics is not None else current.holdout_metrics,
+                "checkpoint_path": checkpoint_path if checkpoint_path is not None else current.checkpoint_path,
+                "note": note if note is not None else current.note,
+                "updated_at": _dt(utc_now()),
+            }
+        )
         with get_connection() as connection:
             connection.execute(
                 """
@@ -429,27 +547,23 @@ class Repository:
                 WHERE id = %s
                 """,
                 (
-                    status or current.status,
-                    dataset_summary_file if dataset_summary_file is not None else current.dataset_summary_file,
-                    review_file if review_file is not None else current.review_file,
-                    evaluation_file if evaluation_file is not None else current.evaluation_file,
-                    holdout_file if holdout_file is not None else current.holdout_file,
-                    holdout_evaluation_file if holdout_evaluation_file is not None else current.holdout_evaluation_file,
-                    encode_json(metrics if metrics is not None else current.metrics),
-                    encode_json(holdout_metrics if holdout_metrics is not None else current.holdout_metrics),
-                    checkpoint_path if checkpoint_path is not None else current.checkpoint_path,
-                    note if note is not None else current.note,
-                    utc_now(),
+                    updated.status,
+                    updated.dataset_summary_file,
+                    updated.review_file,
+                    updated.evaluation_file,
+                    updated.holdout_file,
+                    updated.holdout_evaluation_file,
+                    encode_json(updated.metrics),
+                    encode_json(updated.holdout_metrics),
+                    updated.checkpoint_path,
+                    updated.note,
+                    updated.updated_at.isoformat(),
                     round_id,
                 ),
             )
-        return self.get_round(round_id)
+        return updated
 
-    def get_round(self, round_id: str) -> RoundRecord:
-        with get_connection() as connection:
-            row = connection.execute("SELECT * FROM rounds WHERE id = %s", (round_id,)).fetchone()
-        if row is None:
-            raise KeyError(f"Round {round_id} not found")
+    def _round_row_to_model(self, row) -> RoundRecord:
         return RoundRecord(
             id=row["id"],
             run_id=row["run_id"],
@@ -469,13 +583,20 @@ class Repository:
             updated_at=_dt(row["updated_at"]),
         )
 
+    def get_round(self, round_id: str) -> RoundRecord:
+        with get_connection() as connection:
+            row = connection.execute("SELECT * FROM rounds WHERE id = %s", (round_id,)).fetchone()
+        if row is None:
+            raise KeyError(f"Round {round_id} not found")
+        return self._round_row_to_model(row)
+
     def list_rounds(self, run_id: str) -> list[RoundRecord]:
         with get_connection() as connection:
             rows = connection.execute(
                 "SELECT * FROM rounds WHERE run_id = %s ORDER BY round_index ASC",
                 (run_id,),
             ).fetchall()
-        return [self.get_round(row["id"]) for row in rows]
+        return [self._round_row_to_model(row) for row in rows]
 
     def get_round_by_index(self, run_id: str, round_index: int) -> RoundRecord | None:
         with get_connection() as connection:
@@ -485,7 +606,7 @@ class Repository:
             ).fetchone()
         if row is None:
             return None
-        return self.get_round(row["id"])
+        return self._round_row_to_model(row)
 
     def get_examples_for_split(self, project_id: str, split: Split) -> list[ExampleRecord]:
         with get_connection() as connection:

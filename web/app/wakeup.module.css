@@ -1,9 +1,14 @@
+/* Rendered as an overlay on top of the real page rather than instead of it, so
+   the route content stays in the server-rendered HTML. */
 .screen {
-  min-height: 100dvh;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
   display: grid;
   place-items: center;
   background: var(--bg);
   padding: 24px;
+  overflow-y: auto;
 }
 
 .card {

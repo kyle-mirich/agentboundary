@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE_URL, api, ClassificationResponse, Example, Label, Round, Run, RunDetail, RunEvent, getClientSessionId } from "../../../lib/api";
+import { LABEL_DISPLAY, formatClock, formatMetric, formatTimestamp, metricColor } from "../../../lib/format";
+import BrandMark from "../../../app/components/BrandMark";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type SeedTab = "view" | "add";
@@ -12,12 +14,6 @@ const LABEL_COLORS: Record<Label, string> = {
   in_scope:     "badge-green",
   out_of_scope: "badge-red",
   ambiguous:    "badge-amber",
-};
-
-const LABEL_DISPLAY: Record<Label, string> = {
-  in_scope:     "In Scope",
-  out_of_scope: "Out of Scope",
-  ambiguous:    "Ambiguous",
 };
 
 const LABEL_CSS: Record<Label, string> = {
@@ -42,27 +38,6 @@ const PLAYGROUND_EXAMPLES = [
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function fmt(n: number | null | undefined): string {
-  if (n == null) return "—";
-  return (Math.round(n * 1000) / 1000).toFixed(3);
-}
-
-function metricColor(n: number | null | undefined): string {
-  if (n == null) return "";
-  if (n >= 0.85) return "good";
-  if (n >= 0.7)  return "warn";
-  return "bad";
-}
-
-function fmtTs(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], {
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-  });
-}
-
-function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
 
 // ─── Stage tracker ────────────────────────────────────────────────────────────
 type StageStatus = "pending" | "active" | "done" | "failed";
@@ -169,7 +144,7 @@ function TerminalMetricBar({ label, value, color = "auto" }: {
         <div className={`term-metric-bar ${barClass}`} style={{ width: `${pct}%` }} />
       </div>
       <span className={`term-metric-val ${color === "blue" ? "metric-blue" : metricColor(value)}`}>
-        {fmt(value)}
+        {formatMetric(value)}
       </span>
     </div>
   );
@@ -193,7 +168,7 @@ function TerminalMarkdown({ text }: { text: string }) {
 }
 
 function TerminalEvent({ event, runDetail }: { event: RunEvent; runDetail: RunDetail }) {
-  const ts = fmtTs(event.created_at);
+  const ts = formatTimestamp(event.created_at);
   const p = (event.payload ?? {}) as Record<string, unknown>;
 
   switch (event.event_type) {
@@ -376,7 +351,7 @@ function TerminalEvent({ event, runDetail }: { event: RunEvent; runDetail: RunDe
               {Object.entries(perClass).map(([lbl, m]) => (
                 <div key={lbl} className="term-perclass-row">
                   <span className="term-perclass-label">{lbl.replace(/_/g, " ")}</span>
-                  <span className={`term-perclass-val ${metricColor(m.f1)}`}>{fmt(m.f1)}</span>
+                  <span className={`term-perclass-val ${metricColor(m.f1)}`}>{formatMetric(m.f1)}</span>
                 </div>
               ))}
             </div>
@@ -426,7 +401,7 @@ function TerminalEvent({ event, runDetail }: { event: RunEvent; runDetail: RunDe
               {Object.entries(perClass).map(([lbl, m]) => (
                 <div key={lbl} className="term-perclass-row">
                   <span className="term-perclass-label">{lbl.replace(/_/g, " ")}</span>
-                  <span className={`term-perclass-val ${metricColor(m.f1)}`}>{fmt(m.f1)}</span>
+                  <span className={`term-perclass-val ${metricColor(m.f1)}`}>{formatMetric(m.f1)}</span>
                 </div>
               ))}
             </div>
@@ -512,13 +487,13 @@ function TerminalEvent({ event, runDetail }: { event: RunEvent; runDetail: RunDe
           <div className="run-complete-metrics">
             {bestF1 != null && (
               <div className="run-complete-metric">
-                <div className={`run-complete-metric-val ${metricColor(bestF1)}`}>{fmt(bestF1)}</div>
+                <div className={`run-complete-metric-val ${metricColor(bestF1)}`}>{formatMetric(bestF1)}</div>
                 <div className="run-complete-metric-lbl">Best F1</div>
               </div>
             )}
             {holdoutF1 != null && (
               <div className="run-complete-metric">
-                <div className={`run-complete-metric-val metric-blue`} style={{ color: "var(--blue)" }}>{fmt(holdoutF1)}</div>
+                <div className={`run-complete-metric-val metric-blue`} style={{ color: "var(--blue)" }}>{formatMetric(holdoutF1)}</div>
                 <div className="run-complete-metric-lbl">Holdout F1</div>
               </div>
             )}
@@ -563,7 +538,6 @@ function TerminalEvent({ event, runDetail }: { event: RunEvent; runDetail: RunDe
 export default function ProjectPage() {
   const params = useParams<{ id: string }>();
   const projectId = params.id ?? "";
-  const paramId = useRef(projectId);
 
   const [projectName, setProjectName]     = useState("");
   const [maxRounds, setMaxRounds]         = useState(3);
@@ -588,19 +562,29 @@ export default function ProjectPage() {
   const [error, setError]             = useState("");
   const [loading, setLoading]         = useState(true);
   const [sseActive, setSseActive]     = useState(false);
+  const [stalled, setStalled]         = useState(false);
 
   const terminalRef       = useRef<HTMLDivElement>(null);
   const terminalBottomRef = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);
 
   // ── Initial load ──
+  // Keyed on the live `projectId`. The previous version captured the param in a
+  // ref once and used an empty dep array, so client-side navigation to another
+  // project kept rendering — and mutating — the previous project.
   useEffect(() => {
-    const id = paramId.current;
+    if (!projectId) return;
+    let stale = false;
+
+    setLoading(true);
+    setError("");
     api
-      .getProject(id)
+      .getProject(projectId)
       .then((payload) => {
+        // Guard against a slower earlier load overwriting a newer one.
+        if (stale) return null;
         setProjectName(payload.project.name);
-        setMaxRounds((payload.project as unknown as { max_rounds?: number }).max_rounds ?? 3);
+        setMaxRounds(payload.project.max_rounds ?? 3);
         setExamples(payload.examples);
         setRuns(payload.runs);
         setHoldoutCounts(payload.holdout_counts);
@@ -608,23 +592,41 @@ export default function ProjectPage() {
         const first = payload.runs[0];
         if (first) {
           setSelectedRunId(first.id);
-          return api.getRun(first.id).then(setRunDetail);
+          return api.getRun(first.id).then((detail) => {
+            if (!stale) setRunDetail(detail);
+          });
         }
         return null;
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+      .catch((err) => {
+        if (stale) return;
+        setError(err instanceof Error ? err.message : "Failed to load project");
+      })
+      .finally(() => {
+        if (!stale) setLoading(false);
+      });
+
+    return () => {
+      stale = true;
+    };
+  }, [projectId]);
 
   // ── Live polling ──
   const isLive = runs.some((r) => r.status === "running" || r.status === "queued");
 
   useEffect(() => {
-    if (!isLive || sseActive) return;
-    const id = paramId.current;
+    if (!projectId || !isLive || sseActive) return;
+    let inFlight = false;
+
     const interval = setInterval(async () => {
+      // Skip when a previous poll is still running: on a cold start these
+      // requests take longer than the interval and responses arrive out of
+      // order.
+      if (inFlight) return;
+      inFlight = true;
       try {
-        const payload = await api.getProject(id);
+        const payload = await api.getProject(projectId);
+        setStalled(false);
         setRuns(payload.runs);
         setHoldoutCounts(payload.holdout_counts);
         setHoldoutReady(payload.holdout_ready);
@@ -632,22 +634,31 @@ export default function ProjectPage() {
           payload.runs.find((r) => r.status === "running" || r.status === "queued") ??
           payload.runs[0];
         if (activeRun) {
-          const detail = await api.getRun(activeRun.id);
-          setRunDetail(detail);
+          setSelectedRunId((current) => current ?? activeRun.id);
+          // Only overwrite the terminal for the run actually being viewed,
+          // otherwise clicking another run's tab shows this run's events.
           if (selectedRunId === null || selectedRunId === activeRun.id) {
-            setSelectedRunId(activeRun.id);
+            const detail = await api.getRun(activeRun.id);
+            setRunDetail(detail);
           }
         }
-      } catch { /* silently ignore */ }
+      } catch {
+        // Non-fatal: surface that updates have stalled instead of freezing
+        // silently with the "live" badge still pulsing.
+        setStalled(true);
+      } finally {
+        inFlight = false;
+      }
     }, 3000);
     return () => clearInterval(interval);
-  }, [isLive, sseActive, selectedRunId]);
+  }, [projectId, isLive, sseActive, selectedRunId]);
 
   // ── SSE stream ──
+  const selectedRunStatus = runs.find((r) => r.id === selectedRunId)?.status;
+
   useEffect(() => {
     if (!selectedRunId) return;
-    const selected = runs.find((r) => r.id === selectedRunId);
-    if (!selected || !["running", "queued"].includes(selected.status)) return;
+    if (!["running", "queued"].includes(selectedRunStatus ?? "")) return;
 
     const source = new EventSource(
       `${API_BASE_URL}/runs/${selectedRunId}/events/stream?session_id=${encodeURIComponent(getClientSessionId())}`
@@ -663,7 +674,13 @@ export default function ProjectPage() {
     };
 
     source.addEventListener("run_event", (ev) => {
-      const payload = JSON.parse((ev as MessageEvent).data) as RunEvent;
+      let payload: RunEvent;
+      try {
+        payload = JSON.parse((ev as MessageEvent).data) as RunEvent;
+      } catch {
+        console.warn("Ignoring malformed run_event frame");
+        return;
+      }
       setRunDetail((cur) => {
         if (!cur || cur.id !== selectedRunId) return cur;
         if (cur.events.some((item) => item.id === payload.id)) return cur;
@@ -673,9 +690,14 @@ export default function ProjectPage() {
     });
 
     source.addEventListener("run_done", () => { void refreshRun(); source.close(); setSseActive(false); });
-    source.onerror = () => { source.close(); setSseActive(false); };
+    source.onerror = () => {
+      // EventSource retries on its own. Closing here only disabled live
+      // updates; polling takes over, so the run still progresses.
+      setStalled(true);
+      setSseActive(false);
+    };
     return () => { source.close(); setSseActive(false); };
-  }, [selectedRunId, runs.find((r) => r.id === selectedRunId)?.status]);
+  }, [selectedRunId, selectedRunStatus]);
 
   // ── Auto-scroll terminal ──
   const eventCount = runDetail?.events?.length ?? 0;
@@ -698,10 +720,11 @@ export default function ProjectPage() {
 
   // ── Start run ──
   async function startRun() {
+    if (isLive) return;
     setStartingRun(true);
     setError("");
     try {
-      const run = await api.startRun(paramId.current);
+      const run = await api.startRun(projectId);
       setRuns((r) => [run, ...r]);
       setSelectedRunId(run.id);
       setRunDetail(null);
@@ -718,12 +741,13 @@ export default function ProjectPage() {
     e.preventDefault();
     setSavingSeeds(true);
     setSeedMsg("");
+    setError("");
     try {
       const payload = (Object.entries(seedInputs) as Array<[Label, string]>).flatMap(
         ([label, block]) =>
           block.split("\n").map((l) => l.trim()).filter(Boolean).map((text) => ({ text, label }))
       );
-      const created = await api.addExamples(paramId.current, payload);
+      const created = await api.addExamples(projectId, payload);
       setExamples((ex) => [...ex, ...created]);
       setSeedMsg(`${created.length} examples saved.`);
       setSeedInputs(seedTemplate);
@@ -741,7 +765,7 @@ export default function ProjectPage() {
     setClassifying(true);
     setClassification(null);
     try {
-      const result = await api.classify(paramId.current, message);
+      const result = await api.classify(projectId, message);
       setClassification(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Classification failed");
@@ -825,7 +849,7 @@ export default function ProjectPage() {
           <button
             className="btn btn-primary"
             onClick={startRun}
-            disabled={startingRun || !seedMinimumMet}
+            disabled={startingRun || isLive || !seedMinimumMet}
             type="button"
           >
             {startingRun ? <><span className="spinner spinner-sm" /> Starting…</> : "▶ Start Run"}
@@ -833,7 +857,14 @@ export default function ProjectPage() {
         </div>
       </div>
 
-      {error && <p className="inline-error" style={{ marginBottom: 14 }}>{error}</p>}
+      {error && (
+        <p className="inline-error" role="alert" style={{ marginBottom: 14 }}>{error}</p>
+      )}
+      {stalled && !error && (
+        <p className="inline-error" role="status" style={{ marginBottom: 14 }}>
+          Live updates are interrupted. Progress will resume automatically.
+        </p>
+      )}
       {!seedMinimumMet && (
         <p className="inline-error" style={{ marginBottom: 14 }}>
           Add {missingSeedCounts.in_scope} more in-scope, {missingSeedCounts.out_of_scope} more out-of-scope,
@@ -970,7 +1001,11 @@ export default function ProjectPage() {
                 )}
               </div>
 
-              {seedMsg && <p className="inline-success" style={{ marginBottom: 8 }}>{seedMsg}</p>}
+              {seedMsg && (
+                <p className="inline-success" role="status" style={{ marginBottom: 8 }}>
+                  {seedMsg}
+                </p>
+              )}
 
               <button
                 className="btn btn-primary"
@@ -1000,7 +1035,7 @@ export default function ProjectPage() {
                 <div className="term-run-metrics">
                   {selectedRun.best_macro_f1 != null && (
                     <span className={`badge ${selectedRun.best_macro_f1 >= 0.85 ? "badge-green" : "badge-amber"}`}>
-                      F1 {fmt(selectedRun.best_macro_f1)}
+                      F1 {formatMetric(selectedRun.best_macro_f1)}
                     </span>
                   )}
                   <span className={`badge ${
@@ -1047,7 +1082,7 @@ export default function ProjectPage() {
 
             {selectedRun && (runDetail?.events ?? []).length === 0 && (
               <div className="term-line">
-                <span className="term-ts">{fmtTime(selectedRun.created_at)}</span>
+                <span className="term-ts">{formatClock(selectedRun.created_at)}</span>
                 <span className="term-icon" style={{ color: "var(--blue)" }}>·</span>
                 <span className="term-dim">
                   {selectedRun.status === "queued" ? "Queued — waiting to start…" : "Loading events…"}
@@ -1147,7 +1182,9 @@ export default function ProjectPage() {
           {classification && (
             <>
               <div className="divider" />
-              <div className="classify-result">
+              {/* The result arrives asynchronously; without a live region a
+                  screen-reader user gets no feedback at all on submit. */}
+              <div className="classify-result" role="status" aria-live="polite">
                 <div className="classify-label-row">
                   <span className={`badge ${LABEL_COLORS[classification.label]} classify-label-badge`}>
                     {LABEL_DISPLAY[classification.label]}
@@ -1196,7 +1233,7 @@ export default function ProjectPage() {
                     { label: "Recall",    value: m?.macro_recall },
                   ].map(({ label, value }) => (
                     <div key={label} className="model-stat-item">
-                      <span className={`model-stat-val ${metricColor(value)}`}>{fmt(value)}</span>
+                      <span className={`model-stat-val ${metricColor(value)}`}>{formatMetric(value)}</span>
                       <span className="model-stat-lbl">{label}</span>
                     </div>
                   ));

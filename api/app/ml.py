@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import threading
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 from typing import Iterable
 
@@ -28,9 +28,6 @@ try:
     torch.set_num_interop_threads(1)
 except RuntimeError:
     pass
-
-_model_cache_lock = threading.Lock()
-
 
 def get_device() -> torch.device:
     if torch.backends.mps.is_available():
@@ -92,23 +89,58 @@ class TrainingResult:
     train_count: int
 
 
-@lru_cache(maxsize=2)
+def _cache_capacity() -> int:
+    """Checkpoints stay resident, so the cache must stay small on a container.
+
+    Two fine-tuned DistilBERTs plus the model being trained is enough to exhaust
+    the memory on a small instance, so one slot is the default and the size is
+    configurable for deployments that can afford more.
+    """
+    return max(1, settings.model_cache_size)
+
+
+# Bounded by config at first use and re-evaluated per call, so changing
+# APP_MODEL_CACHE_SIZE takes effect without a code change.
+_model_cache: dict[str, tuple] = {}
+_model_cache_lock = threading.Lock()
+
+
 def _load_model_cached(model_path: str):
     resolved_path = str(Path(model_path).resolve())
-    tokenizer = AutoTokenizer.from_pretrained(resolved_path, local_files_only=True)
-    model = AutoModelForSequenceClassification.from_pretrained(resolved_path, local_files_only=True)
-    device = get_device()
-    model.to(device)
-    model.eval()
-    return tokenizer, model
+    with _model_cache_lock:
+        cached = _model_cache.get(resolved_path)
+        if cached is not None:
+            return cached
+        if len(_model_cache) >= _cache_capacity():
+            # Drop the least recently inserted entry.
+            _model_cache.pop(next(iter(_model_cache)), None)
+        tokenizer = AutoTokenizer.from_pretrained(resolved_path, local_files_only=True)
+        model = AutoModelForSequenceClassification.from_pretrained(resolved_path, local_files_only=True)
+        device = get_device()
+        model.to(device)
+        model.eval()
+        _model_cache[resolved_path] = (tokenizer, model)
+        return _model_cache[resolved_path]
+
+
+def clear_model_cache() -> None:
+    """Release cached checkpoints, for example after a training round."""
+    with _model_cache_lock:
+        _model_cache.clear()
 
 
 def _load_model(model_path: str):
-    with _model_cache_lock:
-        return _load_model_cached(str(Path(model_path).resolve()))
+    return _load_model_cached(str(Path(model_path).resolve()))
 
 
 def train_model(train_examples: Iterable[ExampleRecord], checkpoint_dir: Path) -> TrainingResult:
+    # Seed every relevant RNG so a rerun over the same data produces the same
+    # metrics; without this the reported round-to-round deltas are noise.
+    random.seed(settings.random_seed)
+    torch.manual_seed(settings.random_seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(settings.random_seed)
+
     examples = list(train_examples)
     texts = [item.text for item in examples]
     labels = [LABEL_TO_ID[item.label.value] for item in examples]

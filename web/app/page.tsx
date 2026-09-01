@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   KeyboardEvent,
   RefObject,
   startTransition,
@@ -19,6 +20,8 @@ import {
   RunEvent,
   getClientSessionId,
 } from "../lib/api";
+import { DemoLabel, formatMetric, formatPercent, labelDisplay, LABEL_ORDER, truncate } from "../lib/format";
+import BrandMark from "./components/BrandMark";
 
 type ViewState = "idle" | "processing" | "complete" | "error";
 type LaunchMode = "manual" | "lucky";
@@ -29,17 +32,7 @@ type WorkflowStageId =
   | "training"
   | "refining"
   | "finalizing";
-type ActivityTone = "neutral" | "accent" | "success" | "warn";
-type DemoLabel = "in_scope" | "out_of_scope" | "ambiguous";
 type IdleStep = "welcome" | "compose";
-
-interface ActivityItem {
-  id: string;
-  message: string;
-  detail?: string;
-  tone: ActivityTone;
-  createdAt: string;
-}
 
 interface RoundSummary {
   index: number;
@@ -55,8 +48,6 @@ interface TestResult {
   probabilities: Record<string, number>;
 }
 
-const LABEL_ORDER: DemoLabel[] = ["in_scope", "out_of_scope", "ambiguous"];
-const SEED_PAGE_SIZE = 2;
 const MANUAL_STAGE_TIMING = {
   analyzeAtMs: 1600,
   generateAtMs: 3600,
@@ -67,29 +58,41 @@ const LUCKY_STAGE_TIMING = {
   generateAtMs: 2600,
   minTrainingAtMs: 5000,
 };
+const STREAM_WATCHDOG_INTERVAL_MS = 15_000;
+const MAX_STREAM_RECONNECTS = 5;
+const MAX_STREAM_RECONNECT_DELAY_MS = 15_000;
+
+const WELCOME_STEPS = [
+  { label: "Understand", detail: "Expand the brief into a taxonomy with three concrete labels." },
+  { label: "Generate", detail: "Synthesize ~90 balanced examples with a holdout split." },
+  { label: "Train", detail: "Fit an embedding + classifier head. 30–90 seconds per round." },
+  { label: "Refine", detail: "Add hard cases, retrain, promote the best checkpoint." },
+];
+
+/** Recover a run outcome from replayed events when `run_done` never arrives. */
+function terminalOutcomeFromEvents(
+  events: RunEvent[],
+): { status: string; best_macro_f1: number | null } | null {
+  for (const event of events) {
+    if (event.event_type === "run_failed" || event.event_type === "seed_generation_failed") {
+      return { status: "failed", best_macro_f1: null };
+    }
+    if (event.event_type === "run_completed") {
+      const payload = event.payload ?? {};
+      return {
+        status: "completed",
+        best_macro_f1: typeof payload.best_macro_f1 === "number" ? payload.best_macro_f1 : null,
+      };
+    }
+  }
+  return null;
+}
 
 const EMPTY_SEED_PREVIEW: Record<DemoLabel, string[]> = {
   in_scope: [],
   out_of_scope: [],
   ambiguous: [],
 };
-
-const EMPTY_SEED_COUNTS: Record<DemoLabel, number> = {
-  in_scope: 0,
-  out_of_scope: 0,
-  ambiguous: 0,
-};
-
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max).trimEnd()}…`;
-}
-
-function labelDisplay(label: string): string {
-  if (label === "in_scope") return "In Scope";
-  if (label === "out_of_scope") return "Out of Scope";
-  return "Ambiguous";
-}
 
 function formatSeedPreview(examples: Example[]): Record<DemoLabel, string[]> {
   const liveExamples = examples.filter((example) => example.approved && example.split !== "holdout");
@@ -104,27 +107,8 @@ function formatSeedPreview(examples: Example[]): Record<DemoLabel, string[]> {
   }, { ...EMPTY_SEED_PREVIEW });
 }
 
-function countSeedExamples(examples: Example[]): Record<DemoLabel, number> {
-  return LABEL_ORDER.reduce<Record<DemoLabel, number>>((acc, label) => {
-    acc[label] = examples.filter(
-      (example) => example.source === "human_seed" && example.label === label,
-    ).length;
-    return acc;
-  }, { ...EMPTY_SEED_COUNTS });
-}
-
 function countLiveExamples(examples: Example[]): number {
   return examples.filter((example) => example.approved && example.split !== "holdout").length;
-}
-
-function formatPercent(value: number | null): string {
-  if (value == null) return "—";
-  return `${(value * 100).toFixed(1)}%`;
-}
-
-function formatMetric(value: number | null): string {
-  if (value == null) return "—";
-  return value.toFixed(3);
 }
 
 function formatDuration(totalSeconds: number): string {
@@ -280,33 +264,13 @@ function labelToneClass(label: string): string {
   if (label === "out_of_scope") return styles.toneOutOfScope;
   return styles.toneAmbiguous;
 }
-function BrandMark() {
-  return (
-    <span className={styles.brandMark} aria-hidden="true">
-      <span className={styles.brandMarkCore} />
-      <span className={styles.brandMarkOrbit} />
-    </span>
-  );
-}
-
 function ProcessingShell(props: {
   description: string;
   currentStage: WorkflowStageId;
-  launchMode: LaunchMode;
   latestEvent: RunEvent | null;
-  exampleCount: number;
-  roundBudget: number;
-  rounds: RoundSummary[];
-  bestRoundIndex: number | null;
-  seedPreview: Record<DemoLabel, string[]>;
-  seedCounts: Record<DemoLabel, number>;
-  seedPage: Record<DemoLabel, number>;
-  onChangeSeedPage: (label: DemoLabel, direction: -1 | 1) => void;
-  activityFeed: ActivityItem[];
   liveEvents: RunEvent[];
   elapsedSeconds: number;
   onOpenDetails: () => void;
-  agentModel: string;
   containerRef: RefObject<HTMLElement | null>;
 }) {
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -441,8 +405,6 @@ function ResultShell(props: {
   bestF1: number | null;
   bestHoldoutF1: number | null;
   bestRoundIndex: number | null;
-  roundBudget: number;
-  rounds: RoundSummary[];
   durationSeconds: number;
   testInput: string;
   onTestInputChange: (value: string) => void;
@@ -450,10 +412,8 @@ function ResultShell(props: {
   onClassify: () => void;
   classifying: boolean;
   latestResult: TestResult | null;
-  olderResults: TestResult[];
   suggestionChips: Array<{ text: string; label: DemoLabel }>;
   onSuggestionClick: (text: string) => void;
-  probabilityEntries: Array<{ label: DemoLabel; value: number }>;
   onStartAnother: () => void;
   onOpenDetails: () => void;
   testError: string;
@@ -639,7 +599,7 @@ function ErrorShell(props: {
     <section className={styles.errorShell} aria-label="Run failed">
       <div className={styles.errorCard}>
         <span className={`${styles.statusPill} ${styles.statusPillWarn}`}>Run interrupted</span>
-        <h2 className={styles.errorTitle}>The workflow stopped before the classifier was ready.</h2>
+        <h1 className={styles.errorTitle}>The workflow stopped before the classifier was ready.</h1>
         <p className={styles.errorBody}>
           {props.error || "Something unexpected happened while the backend was processing this run."}
         </p>
@@ -784,10 +744,10 @@ function TraceDrawer(props: {
   open: boolean;
   onClose: () => void;
   description: string;
-  rounds: RoundSummary[];
   bestRoundIndex: number | null;
   bestF1: number | null;
   exampleCount: number;
+  rounds: RoundSummary[];
   logLines: string[];
   liveEvents: RunEvent[];
   runDetail: RunDetail | null;
@@ -1051,7 +1011,7 @@ export default function HomePage() {
   const processingRef = useRef<HTMLElement>(null);
   const setupTimersRef = useRef<number[]>([]);
   const idleTransitionTimerRef = useRef<number | null>(null);
-  const activityIndexRef = useRef(0);
+  const completionTimerRef = useRef<number | null>(null);
   const startedAtRef = useRef<number | null>(null);
   const stageGateUntilRef = useRef<number>(0);
   const luckyTriggerRef = useRef<HTMLButtonElement>(null);
@@ -1061,7 +1021,6 @@ export default function HomePage() {
   const [idleStep, setIdleStep] = useState<IdleStep>("welcome");
   const [renderedIdleStep, setRenderedIdleStep] = useState<IdleStep>("welcome");
   const [idleStepPhase, setIdleStepPhase] = useState<"entered" | "exiting" | "entering">("entered");
-  const [launchMode, setLaunchMode] = useState<LaunchMode>("manual");
   const [currentStage, setCurrentStage] = useState<WorkflowStageId>("starting");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
@@ -1070,18 +1029,8 @@ export default function HomePage() {
   const [luckyLoading, setLuckyLoading] = useState(false);
   const [projectId, setProjectId] = useState("");
   const [runId, setRunId] = useState("");
-  const [roundBudget, setRoundBudget] = useState(3);
-  const [agentModel, setAgentModel] = useState("gpt-5.4-mini");
   const [seedPreview, setSeedPreview] =
     useState<Record<DemoLabel, string[]>>(EMPTY_SEED_PREVIEW);
-  const [seedCounts, setSeedCounts] =
-    useState<Record<DemoLabel, number>>(EMPTY_SEED_COUNTS);
-  const [seedPage, setSeedPage] = useState<Record<DemoLabel, number>>({
-    in_scope: 0,
-    out_of_scope: 0,
-    ambiguous: 0,
-  });
-  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
   const [liveEvents, setLiveEvents] = useState<RunEvent[]>([]);
   const [logLines, setLogLines] = useState<string[]>([]);
   const [rounds, setRounds] = useState<RoundSummary[]>([]);
@@ -1095,37 +1044,21 @@ export default function HomePage() {
   const [testInput, setTestInput] = useState("");
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [classifying, setClassifying] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [luckyPreviewPrompt, setLuckyPreviewPrompt] = useState("");
   const [luckyModalClosing, setLuckyModalClosing] = useState(false);
 
   function clearSetupTimers() {
     setupTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     setupTimersRef.current = [];
+    if (completionTimerRef.current !== null) {
+      window.clearTimeout(completionTimerRef.current);
+      completionTimerRef.current = null;
+    }
     stageGateUntilRef.current = 0;
   }
 
   function shouldHoldIntroStages(): boolean {
     return Date.now() < stageGateUntilRef.current;
-  }
-
-  function pushActivity(
-    message: string,
-    detail = "",
-    tone: ActivityTone = "neutral",
-    createdAt = new Date().toISOString(),
-  ) {
-    const nextItem: ActivityItem = {
-      id: `activity-${activityIndexRef.current++}`,
-      message,
-      detail,
-      tone,
-      createdAt,
-    };
-
-    startTransition(() => {
-      setActivityFeed((previous) => [nextItem, ...previous].slice(0, 18));
-    });
   }
 
   function resetRuntimeState(nextDescription = "") {
@@ -1138,13 +1071,8 @@ export default function HomePage() {
     setLuckyLoading(false);
     setProjectId("");
     setRunId("");
-    setRoundBudget(3);
-    setAgentModel("gpt-5.4-mini");
     setCurrentStage("starting");
     setSeedPreview(EMPTY_SEED_PREVIEW);
-    setSeedCounts(EMPTY_SEED_COUNTS);
-    setSeedPage({ in_scope: 0, out_of_scope: 0, ambiguous: 0 });
-    setActivityFeed([]);
     setLiveEvents([]);
     setLogLines([]);
     setRounds([]);
@@ -1164,16 +1092,13 @@ export default function HomePage() {
   function beginProcessing(mode: LaunchMode, nextDescription: string) {
     resetRuntimeState(nextDescription);
     setView("processing");
-    setLaunchMode(mode);
     setSubmitting(true);
     startedAtRef.current = Date.now();
     if (mode === "lucky") {
       setCurrentStage("starting");
       setLuckyLoading(true);
-      pushActivity("Finding a strong demo brief", "Generating a polished starting point.", "accent");
     } else {
       setCurrentStage("starting");
-      pushActivity("Booting the classifier workspace", "Preparing the premium workflow shell.", "accent");
     }
   }
 
@@ -1205,7 +1130,6 @@ export default function HomePage() {
   async function refreshProjectExamples(projectIdentifier: string) {
     const detail = await api.getProject(projectIdentifier);
     setSeedPreview(formatSeedPreview(detail.examples));
-    setSeedCounts(countSeedExamples(detail.examples));
     setExampleCount(countLiveExamples(detail.examples));
     return detail;
   }
@@ -1228,13 +1152,11 @@ export default function HomePage() {
     if (!options.skipAnalyzeStep) {
       setupTimersRef.current.push(
         window.setTimeout(() => {
-          pushActivity("Understanding the request", "Mapping the support boundary and plan.", "accent");
         }, stageTiming.analyzeAtMs),
       );
     }
     setupTimersRef.current.push(
       window.setTimeout(() => {
-        pushActivity("Generating the seed dataset", "Creating balanced labeled examples.", "accent");
       }, stageTiming.generateAtMs),
     );
 
@@ -1252,15 +1174,11 @@ export default function HomePage() {
         await new Promise((resolve) => window.setTimeout(resolve, remainingDelay));
       }
 
-      setRoundBudget(projectDetail.project.max_rounds);
-      setAgentModel(projectDetail.project.agent_model);
       stageGateUntilRef.current = 0;
-      pushActivity(
-        "Seed set ready",
-        `${countLiveExamples(projectDetail.examples)} examples prepared for training.`,
-        "success",
-      );
     } catch (err) {
+      // Clear the intro-stage timers: the old code left them queued, so
+      // "Generating the seed dataset" could fire after the run had failed.
+      clearSetupTimers();
       setSubmitting(false);
       setLuckyLoading(false);
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
@@ -1303,7 +1221,6 @@ export default function HomePage() {
       if (luckyCancelledRef.current) return;
       beginProcessing("lucky", result.description);
       setLuckyLoading(false);
-      pushActivity("Selected a strong starting brief", truncate(result.description, 120), "success");
       await startQuickStart(result.description, { skipAnalyzeStep: true });
     } catch (err) {
       if (luckyCancelledRef.current) return;
@@ -1320,16 +1237,6 @@ export default function HomePage() {
     setLuckyPreviewPrompt("");
     setLuckyModalClosing(false);
     requestAnimationFrame(() => luckyTriggerRef.current?.focus());
-  }
-
-  function changeSeedPage(label: DemoLabel, direction: -1 | 1) {
-    setSeedPage((previous) => {
-      const totalPages = Math.max(1, Math.ceil(seedPreview[label].length / SEED_PAGE_SIZE));
-      return {
-        ...previous,
-        [label]: Math.min(totalPages - 1, Math.max(0, previous[label] + direction)),
-      };
-    });
   }
 
   async function handleRetry() {
@@ -1386,7 +1293,6 @@ export default function HomePage() {
         ].slice(0, 6),
       );
       if (!inputText) setTestInput("");
-      pushActivity("Ran a live classification", truncate(text, 84), "success");
     } catch (err) {
       setTestError(err instanceof Error ? err.message : "Unable to classify that message.");
     } finally {
@@ -1425,18 +1331,6 @@ export default function HomePage() {
       });
     }
 
-    if (event.message) {
-      const tone: ActivityTone =
-        event.event_type === "run_completed" || event.event_type === "checkpoint_promoted"
-          ? "success"
-          : event.event_type.includes("failed")
-            ? "warn"
-            : event.event_type === "review_started" || event.event_type === "run_reviewed"
-              ? "accent"
-              : "neutral";
-      pushActivity(event.message, event.event_type.replaceAll("_", " "), tone, event.created_at);
-    }
-
     const payload = event.payload as Record<string, unknown>;
     const roundIndex = typeof payload.round_index === "number" ? payload.round_index : null;
     const trainF1 = extractEvaluationMetric(payload, "macro_f1");
@@ -1446,11 +1340,6 @@ export default function HomePage() {
     if (event.event_type === "seed_generation_completed") {
       const counts = payload.counts as Record<string, number> | undefined;
       if (counts) {
-        setSeedCounts({
-          in_scope: counts.in_scope ?? 0,
-          out_of_scope: counts.out_of_scope ?? 0,
-          ambiguous: counts.ambiguous ?? 0,
-        });
         setExampleCount((counts.in_scope ?? 0) + (counts.out_of_scope ?? 0) + (counts.ambiguous ?? 0));
       }
       if (projectId) {
@@ -1525,12 +1414,10 @@ export default function HomePage() {
       setLuckyLoading(false);
       setError("The backend reported that the training run failed.");
       setView("error");
-      pushActivity("Training failed", "The run ended before the classifier was ready.", "warn");
       return;
     }
 
     setCurrentStage("finalizing");
-    pushActivity("Finalizing the live classifier", "Comparing all 3 rounds and confirming the production checkpoint.", "accent");
 
     if (startedAtRef.current) {
       setDurationSeconds(Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000)));
@@ -1539,16 +1426,19 @@ export default function HomePage() {
       setBestF1(raw.best_macro_f1);
     }
 
-    await fetchRunDetail(runId);
+    // Both refreshes are best-effort. Previously an error here produced an
+    // unhandled rejection (this is invoked as `void handleRunDone(...)`) and
+    // the finished classifier was discarded: the user sat on the processing
+    // screen forever after a run that had actually succeeded.
+    await fetchRunDetail(runId).catch(() => null);
     if (projectId) {
-      await refreshProjectExamples(projectId);
+      await refreshProjectExamples(projectId).catch(() => null);
     }
 
     setSubmitting(false);
     setLuckyLoading(false);
-    window.setTimeout(() => {
+    completionTimerRef.current = window.setTimeout(() => {
       setView("complete");
-      pushActivity("Classifier ready", "The live testing surface is now available.", "success");
     }, 700);
   }
 
@@ -1557,12 +1447,7 @@ export default function HomePage() {
     setLuckyLoading(false);
     setError("The live event stream disconnected before the run completed.");
     setView("error");
-    pushActivity("Streaming failed", "The live backend connection was interrupted.", "warn");
   }
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     function onKeyDown(event: globalThis.KeyboardEvent) {
@@ -1590,21 +1475,24 @@ export default function HomePage() {
     window.history.replaceState({}, "", url);
   }, [drawerOpen]);
 
+  // This effect owns `document.body` only. Both effects used to write
+  // `documentElement.style.overflow`, and because layout effects run before
+  // passive ones this effect captured the value the layout effect had already
+  // set to "hidden" — so closing the drawer restored "hidden" and left the page
+  // permanently unscrollable. The layout effect below is the single owner of
+  // `documentElement`.
   useEffect(() => {
     if (!drawerOpen) return;
 
     const bodyOverflow = document.body.style.overflow;
     const bodyOverscroll = document.body.style.overscrollBehavior;
-    const htmlOverflow = document.documentElement.style.overflow;
 
     document.body.style.overflow = "hidden";
     document.body.style.overscrollBehavior = "none";
-    document.documentElement.style.overflow = "hidden";
 
     return () => {
       document.body.style.overflow = bodyOverflow;
       document.body.style.overscrollBehavior = bodyOverscroll;
-      document.documentElement.style.overflow = htmlOverflow;
     };
   }, [drawerOpen]);
 
@@ -1677,37 +1565,109 @@ export default function HomePage() {
     const sessionId = getClientSessionId();
     const url = `${API_BASE_URL}/runs/${runId}/events/stream?session_id=${encodeURIComponent(sessionId)}`;
     let source: EventSource | null = null;
+    let closed = false;
+    let settled = false;
+    let reconnectAttempts = 0;
+    let reconnectTimer: number | undefined;
+    let watchdogTimer: number | undefined;
+
+    function finish(raw: { status: string; best_macro_f1: number | null }) {
+      if (closed || settled) return;
+      settled = true;
+      source?.close();
+      if (watchdogTimer !== undefined) window.clearInterval(watchdogTimer);
+      void handleRunDone(raw);
+    }
+
+    async function checkStatus() {
+      const status = await api.getRunStatus(runId).catch(() => null);
+      if (closed || settled || !status) return;
+      if (status.status === "completed" || status.status === "failed") {
+        finish({ status: status.status, best_macro_f1: status.best_macro_f1 ?? null });
+      }
+    }
 
     async function connect() {
       const history = await api.getRunEvents(runId).catch(() => []);
+      // The previous version created the EventSource after this await, so a
+      // cleanup that ran during the gap saw `source === null` and the stream
+      // leaked. Bail out instead.
+      if (closed) return;
+
       startTransition(() => {
         setLiveEvents(history.slice(-120));
         setLogLines(history.map((event) => formatTerminalEvent(event)).slice(-240));
       });
       history.forEach((event) => recordRunEvent(event, false));
 
+      // If the run already finished before we attached (page reload, deep link,
+      // slow network) `run_done` will never arrive, so recover from history.
+      const replayed = terminalOutcomeFromEvents(history);
+      if (replayed) {
+        finish(replayed);
+        return;
+      }
+
+      source?.close();
       source = new EventSource(url);
+      if (closed) {
+        source.close();
+        return;
+      }
+
       source.addEventListener("run_event", (event: MessageEvent) => {
-        const parsed = JSON.parse(event.data) as RunEvent;
+        let parsed: RunEvent;
+        try {
+          parsed = JSON.parse(event.data) as RunEvent;
+        } catch {
+          console.warn("Ignoring malformed run_event frame");
+          return;
+        }
         recordRunEvent(parsed, true);
       });
       source.addEventListener("run_done", (event: MessageEvent) => {
-        source?.close();
-        void handleRunDone(JSON.parse(event.data) as { status: string; best_macro_f1: number | null });
+        try {
+          finish(JSON.parse(event.data) as { status: string; best_macro_f1: number | null });
+        } catch {
+          finish({ status: "completed", best_macro_f1: null });
+        }
       });
       source.onerror = () => {
-        source?.close();
-        handleStreamFailure();
+        if (closed || settled || !source) return;
+        // EventSource reconnects on its own. Only CLOSED is terminal; anything
+        // else is a transient blip that used to fail the whole run and force a
+        // costly retrain.
+        if (source.readyState !== EventSource.CLOSED) {
+          void checkStatus();
+          return;
+        }
+        if (reconnectAttempts >= MAX_STREAM_RECONNECTS) {
+          handleStreamFailure();
+          return;
+        }
+        reconnectAttempts += 1;
+        const delay = Math.min(1000 * 2 ** (reconnectAttempts - 1), MAX_STREAM_RECONNECT_DELAY_MS);
+        reconnectTimer = window.setTimeout(() => {
+          if (!closed) void connect();
+        }, delay);
       };
     }
 
+    // Watchdog: never depend solely on `run_done` arriving. If the stream dies
+    // silently the run would otherwise sit on the processing screen forever.
+    watchdogTimer = window.setInterval(() => void checkStatus(), STREAM_WATCHDOG_INTERVAL_MS);
+
     void connect();
-    return () => source?.close();
+    return () => {
+      closed = true;
+      if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
+      if (watchdogTimer !== undefined) window.clearInterval(watchdogTimer);
+      source?.close();
+    };
   }, [view, runId]);
 
   const latestEvent = liveEvents[liveEvents.length - 1] ?? null;
   const latestResult = testResults[0] ?? null;
-  const olderResults = testResults.slice(1);
   const bestHoldoutF1 =
     rounds.find((round) => round.index === bestRoundIndex)?.holdoutF1 ?? null;
   const suggestionChips = LABEL_ORDER.flatMap((label) =>
@@ -1780,57 +1740,16 @@ export default function HomePage() {
 
             <div className={styles.welcomeStepsSection}>
               <div className={styles.welcomeStepsTimeline}>
-                <div
-                  className={styles.welcomeStep}
-                  role="note"
-                  tabIndex={0}
-                  aria-label="Define scope step details"
-                >
-                  <div className={styles.stepNumber}>1</div>
-                  <div className={styles.stepLabel}>Understand</div>
-                  <div className={styles.hoverTooltip} role="tooltip">
-                    Expand the brief into a taxonomy with three concrete labels.
-                  </div>
-                </div>
-                <div className={styles.stepConnector}></div>
-                <div
-                  className={styles.welcomeStep}
-                  role="note"
-                  tabIndex={0}
-                  aria-label="Generate examples step details"
-                >
-                  <div className={styles.stepNumber}>2</div>
-                  <div className={styles.stepLabel}>Generate</div>
-                  <div className={styles.hoverTooltip} role="tooltip">
-                    Synthesize ~90 balanced examples with a holdout split.
-                  </div>
-                </div>
-                <div className={styles.stepConnector}></div>
-                <div
-                  className={styles.welcomeStep}
-                  role="note"
-                  tabIndex={0}
-                  aria-label="Train classifier step details"
-                >
-                  <div className={styles.stepNumber}>3</div>
-                  <div className={styles.stepLabel}>Train</div>
-                  <div className={styles.hoverTooltip} role="tooltip">
-                    Fit an embedding + classifier head. 30–90 seconds per round.
-                  </div>
-                </div>
-                <div className={styles.stepConnector}></div>
-                <div
-                  className={styles.welcomeStep}
-                  role="note"
-                  tabIndex={0}
-                  aria-label="Refine step details"
-                >
-                  <div className={styles.stepNumber}>4</div>
-                  <div className={styles.stepLabel}>Refine</div>
-                  <div className={styles.hoverTooltip} role="tooltip">
-                    Add hard cases, retrain, promote the best checkpoint.
-                  </div>
-                </div>
+                {WELCOME_STEPS.map((step, index) => (
+                  <Fragment key={step.label}>
+                    {index > 0 && <div className={styles.stepConnector} />}
+                    <div className={styles.welcomeStep}>
+                      <div className={styles.stepNumber}>{index + 1}</div>
+                      <div className={styles.stepLabel}>{step.label}</div>
+                      <div className={styles.hoverTooltip}>{step.detail}</div>
+                    </div>
+                  </Fragment>
+                ))}
               </div>
             </div>
 
@@ -1844,17 +1763,13 @@ export default function HomePage() {
                   <div className={styles.userLine}>
                     <div
                       className={`${styles.chatMessage} ${styles.userMessage} ${styles.annotatedMessage}`}
-                      role="note"
-                      tabIndex={0}
-                      aria-label="User message classification details"
                     >
                       Can you write me a poem about pizza?
                       <span className={styles.classificationBadge}>
                         <span className={styles.classificationValue}>94% Off Topic</span>
                         <div
                           className={`${styles.hoverTooltip} ${styles.hoverTooltipWide}`}
-                          role="tooltip"
-                          >
+                        >
                           User message is sent to the classifier before the bot ever sees it.
                         </div>
                       </span>
@@ -1863,12 +1778,9 @@ export default function HomePage() {
 
                   <div
                     className={`${styles.chatMessage} ${styles.botMessage} ${styles.annotatedMessage}`}
-                    role="note"
-                    tabIndex={0}
-                    aria-label="Agent response details"
                   >
                     I can only help with orders and delivery questions.
-                    <div className={styles.hoverTooltip} role="tooltip">
+                    <div className={styles.hoverTooltip}>
                       Classified as off-topic, so the bot returns a fixed fallback instead of calling the LLM.
                     </div>
                   </div>
@@ -1914,7 +1826,7 @@ export default function HomePage() {
           </header>
 
           <div className={styles.composerCopy}>
-            <p className={styles.composerTitle}>What should stay inside the fence?</p>
+            <h1 className={styles.composerTitle}>What should stay inside the fence?</h1>
             <p className={styles.composerBody}>
               Describe the scope in your own words. The agent translates it into a taxonomy.
               You can edit the examples later if it missed something.
@@ -2014,7 +1926,7 @@ export default function HomePage() {
         Skip to main content
       </a>
       <main className={styles.page} id="app-main">
-        {!mounted ? null : view === "idle" ? (
+        {view === "idle" ? (
           <div
             className={`${styles.idleStage} ${
               idleStepPhase === "exiting"
@@ -2029,24 +1941,13 @@ export default function HomePage() {
         ) : view === "processing" ? (
           <div className={styles.takeoverStage}>
             <ProcessingShell
-              activityFeed={activityFeed}
-              agentModel={agentModel}
               containerRef={processingRef}
               currentStage={currentStage}
               description={description}
               elapsedSeconds={durationSeconds}
-              exampleCount={exampleCount}
               liveEvents={liveEvents}
               latestEvent={latestEvent}
-              launchMode={launchMode}
-              bestRoundIndex={bestRoundIndex}
-              onChangeSeedPage={changeSeedPage}
               onOpenDetails={() => setDrawerOpen(true)}
-              roundBudget={roundBudget}
-              rounds={rounds}
-              seedCounts={seedCounts}
-              seedPage={seedPage}
-              seedPreview={seedPreview}
             />
           </div>
         ) : view === "complete" ? (
@@ -2060,16 +1961,12 @@ export default function HomePage() {
               durationSeconds={durationSeconds}
               exampleCount={exampleCount}
               latestResult={latestResult}
-              olderResults={olderResults}
               onClassify={() => void handleClassify()}
               onOpenDetails={() => setDrawerOpen(true)}
               onStartAnother={handleStartAnother}
               onSuggestionClick={(text) => void handleClassify(text)}
               onTestInputChange={setTestInput}
               onTestKeyDown={handleTestKey}
-              probabilityEntries={probabilityEntries}
-              roundBudget={roundBudget}
-              rounds={rounds}
               suggestionChips={suggestionChips}
               testError={testError}
               testInput={testInput}

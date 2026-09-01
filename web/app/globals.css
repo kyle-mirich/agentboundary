@@ -1047,14 +1047,24 @@ h1, h2, h3, h4 { margin: 0; }
   color: var(--text-3);
 }
 
+/* Merged from the deleted app/demo-v2.css, which was imported after this file
+   and therefore won on the overlapping properties (padding, overflow-y). The
+   declarations below preserve that final computed result. */
 .terminal-body {
   flex: 1;
+  min-height: 160px;
+  max-height: 280px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: #222 transparent;
   background: #07090e;
   font-family: var(--font-mono), "JetBrains Mono", "SF Mono", "Fira Code", ui-monospace, monospace;
   font-size: 0.78rem;
   line-height: 1.65;
-  padding: 16px 18px 24px;
+  padding: 20px;
 }
 
 .terminal-body::-webkit-scrollbar { width: 4px; }

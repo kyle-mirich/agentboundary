@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import re
+import sqlite3
 import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query
+import psycopg2.errors
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from openai import OpenAI
+from pydantic import Field
 
 from .config import settings
-from .database import _database_backend, _safe_database_target, get_connection, init_db, utc_now
+from .database import _database_backend, _safe_database_target, get_connection, init_db
 from .deep_agent import DeepAgentRunner
 from .models import (
     ClassificationRequest,
@@ -40,6 +45,10 @@ from .seed_generator import generate_lucky_description, generate_seeds
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    # Runs execute as in-process background tasks, so anything still marked
+    # active after a restart can never finish. Fail it now instead of leaving
+    # clients waiting on a stream that will never terminate.
+    repository.reconcile_interrupted_runs()
     yield
 
 
@@ -57,39 +66,83 @@ runner = DeepAgentRunner(repository)
 started_at = time.monotonic()
 
 
-class InMemoryWindowRateLimiter:
-    def __init__(self) -> None:
-        self._hits: dict[str, list[float]] = {}
-        self._lock = threading.Lock()
+class DatabaseWindowRateLimiter:
+    """Fixed-window limiter backed by the database.
+
+    Process-local state would multiply the effective limit by the number of
+    workers and reset on every deploy, so hits are recorded in
+    `rate_limit_hits` and shared by every instance pointed at the same
+    database.
+    """
+
+    def __init__(self, name: str, message: str) -> None:
+        self.name = name
+        self.message = message
+        self._last_pruned = 0.0
+        self._prune_lock = threading.Lock()
 
     def clear(self) -> None:
-        with self._lock:
-            self._hits.clear()
+        """Best-effort reset, used by tests and operational tooling.
+
+        Tolerates a missing `rate_limit_hits` table so it stays safe to call
+        before schema creation.
+        """
+        try:
+            with get_connection() as connection:
+                connection.execute(
+                    "DELETE FROM rate_limit_hits WHERE bucket LIKE %s", (f"{self.name}:%",)
+                )
+        except (sqlite3.OperationalError, psycopg2.errors.UndefinedTable):
+            pass
+        self._last_pruned = 0.0
+
+    def _prune_expired(self, now: float, window_seconds: int) -> None:
+        cutoff = now - max(window_seconds, 1)
+        with self._prune_lock:
+            if time.time() - self._last_pruned < 60:
+                return
+            self._last_pruned = time.time()
+        with get_connection() as connection:
+            connection.execute("DELETE FROM rate_limit_hits WHERE hit_at < %s", (cutoff,))
 
     def check(self, key: str, *, limit: int, window_seconds: int) -> None:
         if limit <= 0:
             return
-        now = time.monotonic()
-        window_start = now - window_seconds
-        with self._lock:
-            if len(self._hits) >= 10_000:
-                self._hits = {
-                    session_key: timestamps
-                    for session_key, timestamps in self._hits.items()
-                    if timestamps and timestamps[-1] >= window_start
-                }
-            recent = [timestamp for timestamp in self._hits.get(key, []) if timestamp >= window_start]
-            if len(recent) >= limit:
-                raise HTTPException(
-                    status_code=429,
-                    detail="Quick-start limit reached for this browser session. Please wait before starting another run.",
-                )
-            recent.append(now)
-            self._hits[key] = recent
+        now = time.time()
+        cutoff = now - window_seconds
+        bucket = f"{self.name}:{key}"
+        with get_connection() as connection:
+            connection.execute(
+                "DELETE FROM rate_limit_hits WHERE bucket = %s AND hit_at < %s",
+                (bucket, cutoff),
+            )
+            row = connection.execute(
+                "SELECT COUNT(*) AS total FROM rate_limit_hits WHERE bucket = %s",
+                (bucket,),
+            ).fetchone()
+            if row["total"] >= limit:
+                raise HTTPException(status_code=429, detail=self.message)
+            connection.execute(
+                "INSERT INTO rate_limit_hits (bucket, hit_at) VALUES (%s, %s)",
+                (bucket, now),
+            )
+        self._prune_expired(now, window_seconds)
 
 
-quick_start_rate_limiter = InMemoryWindowRateLimiter()
+quick_start_rate_limiter = DatabaseWindowRateLimiter(
+    "quick-start",
+    "Quick-start limit reached for this browser session. Please wait before starting another run.",
+)
+run_rate_limiter = DatabaseWindowRateLimiter(
+    "run",
+    "Run limit reached for this browser session. Please wait before starting another run.",
+)
 SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+
+
+def session_fingerprint(session_id: str) -> str:
+    """Short, stable, non-reversible tag so logs can correlate without storing the id."""
+    return hashlib.sha256(session_id.encode("utf-8")).hexdigest()[:12]
 
 
 def _normalize_scope_description(description: str) -> str:
@@ -156,16 +209,37 @@ def _run_quick_start_pipeline(
     runner.execute_run(project_id, run_id, required_rounds)
 
 
-def get_session_id(
-    x_session_id: str | None = Header(default=None, alias="X-Session-Id"),
-    session_id: str | None = Query(default=None),
-) -> str:
-    resolved = x_session_id or session_id
+def _resolve_session_id(resolved: str | None) -> str:
     if not resolved:
         raise HTTPException(status_code=400, detail="Missing session id")
     if not SESSION_ID_PATTERN.fullmatch(resolved):
         raise HTTPException(status_code=400, detail="Invalid session id")
     return resolved
+
+
+def get_session_id(
+    x_session_id: str | None = Header(default=None, alias="X-Session-Id"),
+) -> str:
+    """Session id from the header only.
+
+    Accepting it as a query parameter put the value (which is the sole
+    credential scoping a project) into URLs, browser history, proxy logs and
+    Referer headers on every endpoint.
+    """
+    return _resolve_session_id(x_session_id)
+
+
+def get_stream_session_id(
+    x_session_id: str | None = Header(default=None, alias="X-Session-Id"),
+    session_id: str | None = Query(default=None),
+) -> str:
+    """Session id for SSE, which cannot set request headers.
+
+    `EventSource` has no way to send `X-Session-Id`, so the stream is the one
+    endpoint that still accepts the id as a query parameter.
+    """
+    return _resolve_session_id(x_session_id or session_id)
+
 
 @app.get("/health")
 def healthcheck() -> dict[str, str]:
@@ -250,9 +324,8 @@ def quick_start(
         session_id,
     )
 
-    workspace_root = str(settings.workspace_dir / "pending")
-    run = repository.create_run(project.id, workspace_root)
-    run_workspace = str(settings.workspace_dir / run.id)
+    run = repository.create_run(project.id, str(settings.workspace_dir / "pending"))
+    repository.update_run_workspace(run.id, str(settings.workspace_dir / run.id))
     repository.update_run(run.id, summary="Quick-start demo run")
     repository.create_run_event(
         run.id,
@@ -264,15 +337,9 @@ def quick_start(
         "quick_start_queued",
         project_id=project.id,
         run_id=run.id,
-        session_id=session_id,
+        session=session_fingerprint(session_id),
         required_rounds=required_rounds,
     )
-    if project.sandbox_profile == "isolated_fs":
-        with get_connection() as connection:
-            connection.execute(
-                "UPDATE runs SET workspace_root = %s, updated_at = %s WHERE id = %s",
-                (run_workspace, utc_now(), run.id),
-            )
     background_tasks.add_task(
         _run_quick_start_pipeline,
         project_id=project.id,
@@ -316,7 +383,11 @@ def get_project(project_id: str, session_id: str = Depends(get_session_id)):
 
 
 @app.post("/projects/{project_id}/examples")
-def add_examples(project_id: str, payload: list[ExampleInput], session_id: str = Depends(get_session_id)):
+def add_examples(
+    project_id: str,
+    payload: Annotated[list[ExampleInput], Field(max_length=settings.max_examples_per_request)],
+    session_id: str = Depends(get_session_id),
+):
     try:
         repository.get_project(project_id, session_id=session_id)
     except KeyError as exc:
@@ -338,9 +409,25 @@ def create_run(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    workspace_root = str(settings.workspace_dir / "pending")
-    run = repository.create_run(project_id, workspace_root)
-    run_workspace = str(settings.workspace_dir / run.id)
+
+    # Every run costs OpenAI orchestration plus a full training cycle, so it is
+    # bounded the same way quick-start is. Without this, the project page's
+    # "Start run" button was an unmetered spend path. Checked after validation
+    # so requests that cannot succeed do not consume the session's quota.
+    run_rate_limiter.check(
+        session_id,
+        limit=settings.run_rate_limit,
+        window_seconds=settings.run_rate_window_seconds,
+    )
+    if repository.has_active_run(project_id):
+        raise HTTPException(
+            status_code=409,
+            detail="This project already has a run in progress. Wait for it to finish before starting another.",
+        )
+    run = repository.create_run(project_id, str(settings.workspace_dir / "pending"))
+    # Always give the run its own workspace. Sharing a directory across runs
+    # lets one run read another run's plan, review and summary artifacts.
+    repository.update_run_workspace(run.id, str(settings.workspace_dir / run.id))
     run = repository.update_run(run.id, summary=f"Queued for sandbox profile {project.sandbox_profile}")
     repository.create_run_event(
         run.id,
@@ -352,18 +439,11 @@ def create_run(
         "run_queued",
         project_id=project_id,
         run_id=run.id,
-        session_id=session_id,
+        session=session_fingerprint(session_id),
         max_rounds_override=payload.max_rounds_override,
     )
-    # runs created with isolated_fs always map to a deterministic local workspace path
-    if project.sandbox_profile == "isolated_fs":
-        with get_connection() as connection:
-            connection.execute(
-                "UPDATE runs SET workspace_root = %s, updated_at = %s WHERE id = %s",
-                (run_workspace, utc_now(), run.id),
-            )
     background_tasks.add_task(runner.execute_run, project_id, run.id, payload.max_rounds_override)
-    return repository.get_run(run.id)
+    return run
 
 
 @app.get("/projects/{project_id}/runs")
@@ -435,7 +515,11 @@ def get_run_events(run_id: str, session_id: str = Depends(get_session_id)):
 
 
 @app.get("/runs/{run_id}/events/stream")
-async def stream_run_events(run_id: str, session_id: str = Depends(get_session_id)):
+async def stream_run_events(
+    run_id: str,
+    request: Request,
+    session_id: str = Depends(get_stream_session_id),
+):
     try:
         repository.get_run(run_id, session_id=session_id)
     except KeyError as exc:
@@ -443,16 +527,33 @@ async def stream_run_events(run_id: str, session_id: str = Depends(get_session_i
 
     async def event_generator():
         last_id = 0
+        deadline = time.monotonic() + settings.run_stream_max_seconds
         while True:
+            # Without an explicit disconnect check this coroutine outlives its
+            # client: `asyncio.sleep` never touches the socket, so nothing
+            # notices the peer is gone and the loop polls the database forever.
+            if await request.is_disconnected():
+                return
+
             events = repository.list_run_events(run_id, after_id=last_id, session_id=session_id)
             for event in events:
                 last_id = event.id
                 yield f"event: run_event\ndata: {json.dumps(event.model_dump(mode='json'))}\n\n"
+
             run = repository.get_run(run_id, session_id=session_id)
-            if run.status in {RunStatus.COMPLETED, RunStatus.FAILED}:
+            terminal = run.status in {RunStatus.COMPLETED, RunStatus.FAILED}
+            if terminal:
                 yield f"event: run_done\ndata: {json.dumps(run.model_dump(mode='json'))}\n\n"
-                break
-            await asyncio.sleep(1)
+                return
+
+            if time.monotonic() >= deadline:
+                yield (
+                    "event: stream_closed\n"
+                    f"data: {json.dumps({'reason': 'stream_timeout', 'run_id': run_id})}\n\n"
+                )
+                return
+
+            await asyncio.sleep(settings.run_stream_poll_interval)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -476,7 +577,7 @@ def classify(project_id: str, payload: ClassificationRequest, session_id: str = 
         "classification_completed",
         project_id=project_id,
         run_id=run.id,
-        session_id=session_id,
+        session=session_fingerprint(session_id),
         label=result.label.value,
         confidence=result.confidence,
     )

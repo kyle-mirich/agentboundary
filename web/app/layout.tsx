@@ -1,5 +1,4 @@
 import "./globals.css";
-import "./demo-v2.css";
 import type { Metadata, Viewport } from "next";
 import WakeupGate from "./wakeup";
 

@@ -17,11 +17,6 @@ export type Project = {
   updated_at: string;
 };
 
-export type ProjectSummary = Project & {
-  seed_counts: Record<string, number>;
-  holdout_counts: Record<string, number>;
-};
-
 export type Example = {
   id: string;
   text: string;
@@ -104,7 +99,47 @@ export type LuckyPromptResponse = {
 };
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+
+/** False when the app will silently call the visitor's own localhost. */
+export const isApiBaseUrlConfigured = Boolean(process.env.NEXT_PUBLIC_API_BASE_URL);
+
+if (typeof window !== "undefined" && process.env.NODE_ENV === "production" && !isApiBaseUrlConfigured) {
+  // Warn rather than throw: throwing at module scope breaks the build for
+  // anyone building without the variable, including CI.
+  console.warn(
+    "NEXT_PUBLIC_API_BASE_URL is not set, so the app is calling http://127.0.0.1:8000. " +
+      "Set it to the deployed API URL."
+  );
+}
+
 const SESSION_STORAGE_KEY = "scope-classifier-session-id";
+
+/** Error carrying the HTTP status so callers can branch on it. */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string, readonly detail?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+/** Copy shown to users. Backend detail is logged, never rendered verbatim. */
+function friendlyMessage(status: number): string {
+  if (status === 404) return "That item could not be found.";
+  if (status === 409) return "This project already has a run in progress.";
+  if (status === 422) return "That input was not accepted. Check the fields and try again.";
+  if (status === 429) return "You have hit the demo limit. Please wait a moment and try again.";
+  if (status >= 500) return "The classifier service is unavailable. Please try again shortly.";
+  return "Something went wrong. Please try again.";
+}
+
+function sanitizeDetail(raw: string): string {
+  // A FastAPI or proxy failure can return a full HTML page or a Python
+  // traceback. Trim it and strip markup before it is ever logged or shown.
+  return raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+}
 
 export async function checkBackendHealth(timeoutMs = 5000): Promise<boolean> {
   if (typeof window === "undefined") return true;
@@ -129,63 +164,143 @@ function createFallbackSessionId(): string {
   return `session-${timestamp}-${random}`;
 }
 
+// Fallback for browsers where localStorage throws (Safari private mode,
+// sandboxed iframes, blocked storage, quota exceeded). Without this every
+// request would fail before it was even sent.
+let memorySessionId: string | null = null;
+
 export function getClientSessionId(): string {
   if (typeof window === "undefined") {
     return "server-render";
   }
-  const existing = window.localStorage.getItem(SESSION_STORAGE_KEY);
-  if (existing) return existing;
+  try {
+    const existing = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    if (existing) return existing;
+  } catch {
+    // Storage unavailable; fall through to the in-memory session.
+  }
   const created =
-    typeof window.crypto?.randomUUID === "function"
+    memorySessionId ??
+    (typeof window.crypto?.randomUUID === "function"
       ? window.crypto.randomUUID()
-      : createFallbackSessionId();
-  window.localStorage.setItem(SESSION_STORAGE_KEY, created);
+      : createFallbackSessionId());
+  memorySessionId = created;
+  try {
+    window.localStorage.setItem(SESSION_STORAGE_KEY, created);
+  } catch {
+    // Ignored: the in-memory id keeps this session working.
+  }
   return created;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const sessionId = getClientSessionId();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Session-Id": sessionId,
-      ...(init?.headers ?? {})
-    },
-    cache: "no-store"
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(detail || `Request failed: ${response.status}`);
+type RequestOptions = RequestInit & { timeoutMs?: number };
+
+async function request<T>(path: string, init?: RequestOptions): Promise<T> {
+  const { timeoutMs = 30_000, ...fetchInit } = init ?? {};
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...fetchInit,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Session-Id": getClientSessionId(),
+        ...(fetchInit.headers ?? {})
+      },
+      cache: "no-store"
+    });
+  } catch (error) {
+    clearTimeout(timer);
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError(408, "The request timed out. Please try again.");
+    }
+    throw new ApiError(0, "Could not reach the classifier service.");
   }
-  return response.json() as Promise<T>;
+  clearTimeout(timer);
+
+  if (!response.ok) {
+    let detail = "";
+    try {
+      detail = sanitizeDetail(await response.text());
+    } catch {
+      detail = "";
+    }
+    if (detail) console.error(`API ${response.status} ${path}: ${detail}`);
+    throw new ApiError(response.status, friendlyMessage(response.status), detail);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+  const text = await response.text();
+  if (!text.trim()) {
+    return undefined as T;
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    console.error(`API ${path} returned non-JSON response`);
+    throw new ApiError(response.status, "Received an unexpected response from the service.");
+  }
+}
+
+// Responses are asserted to T and then dereferenced by the pages, so a 200
+// with an unexpected shape produced "Cannot read properties of undefined".
+// These guards turn that into a real error message.
+function asArray<T>(value: unknown, name: string): T[] {
+  if (!Array.isArray(value)) throw new ApiError(200, `Unexpected ${name} response.`);
+  return value as T[];
+}
+
+function parseProjectDetail(payload: unknown): ProjectDetail {
+  const project = (payload as ProjectDetail | null)?.project;
+  if (!project?.id) throw new ApiError(200, "Unexpected project response.");
+  const detail = payload as ProjectDetail;
+  return {
+    project,
+    examples: asArray<Example>(detail.examples ?? [], "examples"),
+    runs: asArray<Run>(detail.runs ?? [], "runs"),
+    holdout_counts: detail.holdout_counts ?? {},
+    holdout_ready: Boolean(detail.holdout_ready)
+  };
+}
+
+function parseRunDetail(payload: unknown): RunDetail {
+  const run = payload as RunDetail | null;
+  if (!run?.id) throw new ApiError(200, "Unexpected run response.");
+  return { ...run, rounds: asArray<Round>(run.rounds ?? [], "rounds"), events: asArray<RunEvent>(run.events ?? [], "events") };
 }
 
 export const api = {
-  listProjects: () => request<ProjectSummary[]>("/projects"),
-  getProject: (projectId: string) => request<ProjectDetail>(`/projects/${projectId}`),
-  createProject: (payload: Omit<Project, "id" | "created_at" | "updated_at" | "promoted_run_id">) =>
-    request<Project>("/projects", { method: "POST", body: JSON.stringify(payload) }),
+  getProject: async (projectId: string) =>
+    parseProjectDetail(await request<unknown>(`/projects/${projectId}`)),
   addExamples: (projectId: string, payload: Array<{ text: string; label: Label }>) =>
     request<Example[]>(`/projects/${projectId}/examples`, { method: "POST", body: JSON.stringify(payload) }),
-  startRun: (projectId: string) => request<Run>(`/projects/${projectId}/runs`, { method: "POST", body: JSON.stringify({}) }),
-  getRun: (runId: string) => request<RunDetail>(`/runs/${runId}`),
-  getRunStatus: (runId: string) => request<RunStatusResponse>(`/runs/${runId}/status`),
-  getRunEvents: (runId: string) => request<RunEvent[]>(`/runs/${runId}/events`),
+  startRun: (projectId: string) =>
+    request<Run>(`/projects/${projectId}/runs`, { method: "POST", body: JSON.stringify({}) }),
+  getRun: async (runId: string) => parseRunDetail(await request<unknown>(`/runs/${runId}`)),
+  // Used by the run watchdog to recover a status the stream never delivered.
+  getRunStatus: (runId: string) => request<RunStatusResponse>(`/runs/${runId}/status`, { timeoutMs: 15_000 }),
+  getRunEvents: async (runId: string) =>
+    asArray<RunEvent>(await request<unknown>(`/runs/${runId}/events`), "events"),
   classify: (projectId: string, text: string) =>
     request<ClassificationResponse>(`/projects/${projectId}/classify`, {
       method: "POST",
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text }),
+      // Cold-start checkpoint loads can exceed the default timeout.
+      timeoutMs: 60_000
     }),
   quickStart: (description: string) =>
     request<QuickStartResponse>("/quick-start", {
       method: "POST",
       body: JSON.stringify({ description }),
+      timeoutMs: 60_000
     }),
   luckyPrompt: () =>
     request<LuckyPromptResponse>("/quick-start/lucky", {
       method: "POST",
-    }),
-  promoteRun: (projectId: string, runId: string) =>
-    request<void>(`/projects/${projectId}/promote/${runId}`, { method: "POST" }),
+      timeoutMs: 15_000
+    })
 };

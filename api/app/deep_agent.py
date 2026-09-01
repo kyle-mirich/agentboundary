@@ -764,7 +764,18 @@ def _make_tools(context: AgentContext) -> list:
             note: A short summary of why the checkpoint is being promoted.
         """
         rounds = repository.list_rounds(context.run_id)
-        selected = next(item for item in rounds if item.round_index == round_index)
+        selected = next((item for item in rounds if item.round_index == round_index), None)
+        if selected is None:
+            # Return an error instead of raising: an exception here aborts the
+            # whole run and throws away every round already completed.
+            available = [item.round_index for item in rounds]
+            return json.dumps(
+                {
+                    "promoted": False,
+                    "error": f"No round {round_index} exists for this run",
+                    "available_rounds": available,
+                }
+            )
         repository.update_run(
             context.run_id,
             best_round_id=selected.id,
@@ -772,7 +783,9 @@ def _make_tools(context: AgentContext) -> list:
         )
         repository.promote_run(context.project_id, context.run_id)
         emit("checkpoint_promoted", "Best checkpoint promoted", {"round_index": round_index, "note": note})
-        return json.dumps({"promoted_round_id": selected.id, "round_index": round_index, "note": note})
+        return json.dumps(
+            {"promoted": True, "promoted_round_id": selected.id, "round_index": round_index, "note": note}
+        )
 
     @tool(parse_docstring=True)
     def classify_message(text: str, round_index: int | None = None) -> str:
@@ -786,10 +799,14 @@ def _make_tools(context: AgentContext) -> list:
         if round_index is None:
             rounds = repository.list_rounds(context.run_id)
             if not rounds:
-                raise RuntimeError("No checkpoints available yet")
+                return json.dumps({"error": "No checkpoints available yet"})
             round_index = rounds[-1].round_index
         checkpoint_dir = context.artifacts_root / context.run_id / f"round-{round_index:02d}"
-        prediction = classify_text(text, checkpoint_dir)
+        try:
+            prediction = classify_text(text, checkpoint_dir)
+        except (OSError, ValueError) as exc:
+            # A missing or unreadable checkpoint used to fail the entire run.
+            return json.dumps({"error": f"Checkpoint for round {round_index} is unavailable: {exc}"})
         return prediction.model_dump_json()
 
     return [
@@ -848,10 +865,21 @@ class DeepAgentRunner:
             "review_file": round_record.review_file,
         }
 
-    def _ensure_final_summary(self, run_record, best_round, rounds: int) -> str:
+    def _ensure_final_summary(
+        self,
+        run_record,
+        best_round,
+        rounds: int,
+        workspace: WorkspaceIO | None = None,
+    ) -> str:
         summary_path = Path(run_record.workspace_root) / "reports" / "final-summary.md"
         if summary_path.exists():
             return summary_path.read_text()
+        if workspace is not None:
+            try:
+                return workspace.read_text(FINAL_SUMMARY_PATH)
+            except Exception:
+                pass
 
         comparisons = self._build_round_comparison(run_record.id)
         comparison_lines = "\n".join(
@@ -881,6 +909,14 @@ class DeepAgentRunner:
         )
         summary_path.parent.mkdir(parents=True, exist_ok=True)
         summary_path.write_text(summary)
+        if workspace is not None:
+            # Keep the run's real workspace in sync. For the runloop profile the
+            # agent's artifacts live in a sandbox, so the local path is not the
+            # workspace and the two must be written explicitly.
+            try:
+                workspace.write_text(FINAL_SUMMARY_PATH, summary)
+            except Exception:
+                pass
         self._emit(
             run_record.id,
             "final_summary_recorded",
@@ -993,7 +1029,7 @@ Be concise, concrete, and tool-driven. Use round numbers starting at 1.
                         "round_comparison": round_comparison,
                     },
                 )
-                self._ensure_final_summary(run_record, best_round, rounds)
+                self._ensure_final_summary(run_record, best_round, rounds, workspace)
                 self.repository.update_run(
                     run_id,
                     status=RunStatus.COMPLETED,

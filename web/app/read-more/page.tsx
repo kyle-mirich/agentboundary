@@ -1,15 +1,7 @@
 import Link from "next/link";
+import BrandMark from "../components/BrandMark";
 import type { Metadata } from "next";
 import styles from "./page.module.css";
-
-function BrandMark() {
-  return (
-    <span className={styles.brandMark} aria-hidden="true">
-      <span className={styles.brandMarkCore} />
-      <span className={styles.brandMarkOrbit} />
-    </span>
-  );
-}
 
 export const metadata: Metadata = {
   title: "Read more | Agent Boundary",
@@ -19,8 +11,12 @@ export const metadata: Metadata = {
 
 export default function ReadMorePage() {
   return (
-    <main className={styles.page}>
-      <div className={styles.shell}>
+    <>
+      <a className="skip-link" href="#read-more-main">
+        Skip to main content
+      </a>
+      <main className={styles.page} id="read-more-main">
+        <div className={styles.shell}>
         <header className={styles.topBar}>
           <Link className={styles.brandLink} href="/">
             <BrandMark />
@@ -50,9 +46,6 @@ export default function ReadMorePage() {
               <div className={styles.ctaRow}>
                 <Link className={styles.primaryCta} href="/">
                   Back to demo
-                </Link>
-                <Link className={styles.secondaryCta} href="/">
-                  Start another run
                 </Link>
               </div>
             </div>
@@ -220,7 +213,8 @@ export default function ReadMorePage() {
             </p>
           </section>
         </article>
-      </div>
-    </main>
+        </div>
+      </main>
+    </>
   );
 }

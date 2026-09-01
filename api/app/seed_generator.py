@@ -14,12 +14,12 @@ You are generating labeled training data for a text classifier.
 Domain:
 {description}
 
-Generate exactly 90 examples as a JSON array only. Do not include markdown, comments, or explanation.
+Generate exactly {total} examples as a JSON array only. Do not include markdown, comments, or explanation.
 
 Label balance:
-- 30 "in_scope": clearly inside the domain and unambiguous
-- 30 "out_of_scope": clearly outside the domain and unambiguous
-- 30 "ambiguous": plausible boundary cases that could reasonably be confused
+- {per_label} "in_scope": clearly inside the domain and unambiguous
+- {per_label} "out_of_scope": clearly outside the domain and unambiguous
+- {per_label} "ambiguous": plausible boundary cases that could reasonably be confused
 
 Quality rules:
 - Write realistic end-user messages, not synthetic label descriptions.
@@ -34,7 +34,6 @@ Return this schema only:
 """
 
 _REQUEST_TIMEOUT_SECONDS = 120.0
-_SEEDS_PER_LABEL = 30
 _LUCKY_PROMPTS = [
     "The chatbot should handle questions about Star Wars lore, characters, timelines, and canon debates.",
     "The chatbot should handle feedback on startup pitches, business models, and target customers.",
@@ -63,12 +62,15 @@ def _fallback_lucky_description() -> str:
 
 
 def generate_seeds(description: str) -> list[ExampleInput]:
-    """Call GPT-5 to produce the configured labeled seed examples for the description.
+    """Generate the configured labeled seed examples for the description.
 
-    Retries once on parse failure. Raises RuntimeError if both attempts fail.
+    Retries once on failure. Raises RuntimeError if both attempts fail.
     """
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is required to generate seeds")
+
+    per_label = settings.seed_examples_per_label
+    total = per_label * 3
 
     client = OpenAI(
         api_key=settings.openai_api_key,
@@ -78,29 +80,49 @@ def generate_seeds(description: str) -> list[ExampleInput]:
 
     def _attempt() -> list[ExampleInput]:
         response = client.chat.completions.create(
-            model=settings.default_agent_model,
+            # Seed generation is structured example generation, so it uses the
+            # dedicated generation model rather than the orchestration model.
+            model=settings.responses_generation_model,
             messages=[
                 {
                     "role": "user",
-                    "content": _SEED_PROMPT.format(description=description),
+                    "content": _SEED_PROMPT.format(
+                        description=description,
+                        per_label=per_label,
+                        total=total,
+                    ),
                 }
             ],
         )
         raw = response.choices[0].message.content
         data = json.loads(raw)
-        examples = [
-            ExampleInput(
-                text=item["text"],
-                label=Label(item["label"]),
-                source=ExampleSource.HUMAN_SEED,
+        if not isinstance(data, list):
+            raise ValueError("Seed response was not a JSON array")
+
+        by_label: dict[Label, list[ExampleInput]] = {label: [] for label in Label}
+        for item in data:
+            text = str(item.get("text", "")).strip()
+            if not text:
+                continue
+            label = Label(item["label"])
+            # Truncate rather than trust the model: an oversized response would
+            # otherwise insert an unbounded number of rows.
+            if len(by_label[label]) >= per_label:
+                continue
+            by_label[label].append(
+                ExampleInput(text=text, label=label, source=ExampleSource.HUMAN_SEED)
             )
-            for item in data
-        ]
-        labels_present = {e.label for e in examples}
+
         required = {Label.IN_SCOPE, Label.OUT_OF_SCOPE, Label.AMBIGUOUS}
-        if not required.issubset(labels_present):
-            raise ValueError(f"Missing labels: {required - labels_present}")
-        return examples
+        short = {
+            label: per_label - len(by_label[label])
+            for label in required
+            if len(by_label[label]) < per_label
+        }
+        if short:
+            raise ValueError(f"Insufficient examples per label: {short}")
+
+        return by_label[Label.IN_SCOPE] + by_label[Label.OUT_OF_SCOPE] + by_label[Label.AMBIGUOUS]
 
     last_exc: Exception | None = None
     for _ in range(2):

@@ -463,34 +463,6 @@
   min-width: 0;
 }
 
-.brandMark {
-  position: relative;
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  background: linear-gradient(160deg, rgba(178, 168, 144, 0.18), var(--accent-soft));
-  border: 1.5px solid var(--accent-soft-5);
-  box-shadow: 0 8px 32px rgba(77, 65, 47, 0.1);
-  overflow: hidden;
-}
-
-.brandMarkCore,
-.brandMarkOrbit {
-  position: absolute;
-  border-radius: 999px;
-}
-
-.brandMarkCore {
-  inset: 12px;
-  background: linear-gradient(180deg, #8fa08d 0%, #6f8477 100%);
-  box-shadow: 0 0 20px var(--accent-soft-5);
-}
-
-.brandMarkOrbit {
-  inset: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.26);
-}
-
 .productEyebrow,
 .panelLabel,
 .stageCaption,

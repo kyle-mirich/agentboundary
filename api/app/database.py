@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,6 +12,7 @@ from urllib.parse import urlparse
 import psycopg2
 import psycopg2.errors
 import psycopg2.extras
+import psycopg2.pool
 
 from .config import settings
 
@@ -85,8 +87,9 @@ def _safe_database_target(database_url: str) -> str:
     parsed = urlparse(database_url)
     host = parsed.hostname or "<missing>"
     port = parsed.port or "<missing>"
-    username = parsed.username or "<missing>"
-    return f"host={host} port={port} user={username}"
+    # The username is deliberately omitted: /health/details is unauthenticated
+    # and a database user name is useful to an attacker.
+    return f"host={host} port={port}"
 
 
 def _database_connection_error(exc: Exception) -> RuntimeError:
@@ -114,17 +117,51 @@ def _connect_sqlite():
     return conn
 
 
+_pool: psycopg2.pool.ThreadedConnectionPool | None = None
+_pool_lock = threading.Lock()
+
+
+def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
+    """Lazily create the shared Postgres pool.
+
+    Opening a fresh connection per query is prohibitively expensive against a
+    hosted pooler, so Postgres connections are reused. SQLite stays per-call
+    because it is local and cheap.
+    """
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                try:
+                    _pool = psycopg2.pool.ThreadedConnectionPool(
+                        settings.database_pool_min_size,
+                        settings.database_pool_max_size,
+                        settings.database_url,
+                    )
+                except psycopg2.OperationalError as exc:
+                    raise _database_connection_error(exc) from exc
+    return _pool
+
+
+def reset_pool() -> None:
+    """Drop the shared pool so the next call reconnects with current settings."""
+    global _pool
+    with _pool_lock:
+        if _pool is not None:
+            _pool.closeall()
+            _pool = None
+
+
 @contextmanager
 def get_connection() -> Iterator[_Cursor]:
     backend = _database_backend()
+    pool = None
     if backend == "sqlite":
         conn = _connect_sqlite()
         cur = conn.cursor()
     else:
-        try:
-            conn = psycopg2.connect(settings.database_url)
-        except psycopg2.OperationalError as exc:
-            raise _database_connection_error(exc) from exc
+        pool = _get_pool()
+        conn = pool.getconn()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     wrapper = _Cursor(cur, backend=backend)
@@ -136,7 +173,10 @@ def get_connection() -> Iterator[_Cursor]:
         raise
     finally:
         cur.close()
-        conn.close()
+        if pool is None:
+            conn.close()
+        else:
+            pool.putconn(conn)
 
 
 def _create_shared_schema(connection: _Cursor) -> None:
@@ -188,6 +228,15 @@ def _create_shared_schema(connection: _Cursor) -> None:
             workspace_root TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
+        )
+        """
+    )
+    # No surrogate key: this keeps the DDL identical on SQLite and PostgreSQL.
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS rate_limit_hits (
+            bucket TEXT NOT NULL,
+            hit_at REAL NOT NULL
         )
         """
     )
@@ -243,6 +292,12 @@ def _init_sqlite_schema(connection: _Cursor) -> None:
     )
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_run_events_run_id ON run_events(run_id)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_rate_limit_hits_bucket ON rate_limit_hits(bucket)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status)"
     )
 
 
@@ -312,6 +367,18 @@ def _init_postgres_schema(connection: _Cursor) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_run_events_run_id
         ON run_events(run_id)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_rate_limit_hits_bucket
+        ON rate_limit_hits(bucket)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_runs_status
+        ON runs(status)
         """
     )
 
